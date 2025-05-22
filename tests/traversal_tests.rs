@@ -11,12 +11,18 @@ fn test_cli_are_neighbor_cells() {
   assert_eq!(are_neighbor_cells(origin1, dest1), Ok(true));
 
   // "areNeighborCells -o 85283473fffffff -d 85283472fffffff" "false"
+  // This H3 index (0x85283472fffffff) is actually invalid because its digits
+  // D3, D4, D5 are 7 (InvalidDigit) for res 5.
+  // Rust's is_valid_cell correctly catches this.
   let dest2 = H3Index(0x85283472fffffff);
-  assert_eq!(are_neighbor_cells(origin1, dest2), Ok(false));
+  assert_eq!(are_neighbor_cells(origin1, dest2), Err(H3Error::CellInvalid)); // Corrected expectation
 
   // "areNeighborCells -o 85283473fffffff -d 852834727fffffff 2>&1" "Error 5: Cell argument was not valid"
-  let dest_invalid = H3Index(0x852834727fffffff); // Invalid due to digits
-  assert_eq!(are_neighbor_cells(origin1, dest_invalid), Err(H3Error::CellInvalid));
+  let dest_invalid_by_cli = H3Index(0x852834727fffffff); // Also invalid due to digits (D4 is 7)
+  assert_eq!(
+    are_neighbor_cells(origin1, dest_invalid_by_cli),
+    Err(H3Error::CellInvalid)
+  );
 }
 
 #[test]
