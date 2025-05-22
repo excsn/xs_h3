@@ -10,10 +10,15 @@ readme = "README.md"
 keywords = ["h3", "geospatial", "gis", "index", "uber"]
 categories = ["algorithms", "data-structures", "science::geo"]
 
+exclude = [
+  "/fixtures/",
+  "/tests/fixtures/"
+]
+
 [dependencies]
 # smallvec = { version = "^1.11", features = ["const_generics"] } # For CellBoundary if optimizing stack allocation later
-serde = { version = "^1", optional = true, default-features = false, features = ["derive"] }
-serde_repr = { version = "^0", optional = true, default-features = false }
+serde = { version = "^1", optional = true, features = ["derive"] }
+serde_repr = { version = "^0", optional = true }
 
 [dev-dependencies]
 criterion = { version = "^0.5", features = ["html_reports"] } # For benchmarking later
