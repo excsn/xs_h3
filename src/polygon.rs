@@ -156,7 +156,7 @@ pub(crate) fn point_inside_geoloop(geoloop: &GeoLoop, bbox: &BBox, coord: &LatLn
 /// Sum over the edges `(x2-x1)(y2+y1)`. If sum is >0, then clockwise.
 /// See: https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
 /// This is a "shoelace formula" variant for area, where sign indicates winding.
-fn generic_is_clockwise(loop_verts: &[LatLng], num_loop_verts: usize, is_transmeridian_bbox: bool) -> bool {
+pub(crate) fn generic_is_clockwise(loop_verts: &[LatLng], num_loop_verts: usize, is_transmeridian_bbox: bool) -> bool {
     if num_loop_verts < 3 {
         return false; // Not a polygon
     }
