@@ -32,83 +32,66 @@ fn _has_child_at_res(parent_h: H3Index, child_res: i32) -> bool {
 }
 
 /// Produces the parent H3 index of `h` at `parent_res`.
-/// Produces the parent H3 index of `h` at `parent_res`.
 pub fn cell_to_parent(h: H3Index, parent_res: i32) -> Result<H3Index, H3Error> {
-  // <<< ADDED [Debug Println Start] >>>
-  println!(
-    "---- cell_to_parent ---- START Input H3: {:x} (Res {}), Target Parent Res: {}",
-    h.0,
-    get_resolution(h), // Get resolution before any modification for logging
-    parent_res
-  );
-  // <<< ADDED [Debug Println Start] END >>>
+  // println!(
+  //   "---- cell_to_parent ---- START Input H3: {:x} (Res {}), Target Parent Res: {}",
+  //   h.0,
+  //   get_resolution(h), // Get resolution before any modification for logging
+  //   parent_res
+  // );
 
   if !h3_is_valid_cell(h) {
-    // Added more robust validation upfront
-    // <<< ADDED [Debug Println Invalid Cell] >>>
-    println!("  cell_to_parent: Input H3 {:x} is invalid.", h.0);
-    // <<< ADDED [Debug Println Invalid Cell] END >>>
+    // println!("  cell_to_parent: Input H3 {:x} is invalid.", h.0);
     return Err(H3Error::CellInvalid);
   }
 
   let child_res = get_resolution(h);
   if parent_res < 0 || parent_res > child_res || parent_res > MAX_H3_RES {
     // child_res check also implicitly done by is_valid_cell
-    // <<< ADDED [Debug Println ResDomain] >>>
-    println!(
-      "  cell_to_parent: parent_res {} out of domain for child_res {}.",
-      parent_res, child_res
-    );
-    // <<< ADDED [Debug Println ResDomain] END >>>
+    // println!(
+    //   "  cell_to_parent: parent_res {} out of domain for child_res {}.",
+    //   parent_res, child_res
+    // );
     return Err(H3Error::ResDomain); // More appropriate for parent_res > child_res
   }
 
   if parent_res == child_res {
-    // <<< ADDED [Debug Println Same Res] >>>
-    println!(
-      "  cell_to_parent: Parent res same as child res. Returning original H3: {:x}",
-      h.0
-    );
-    // <<< ADDED [Debug Println Same Res] END >>>
+    // println!(
+    //   "  cell_to_parent: Parent res same as child res. Returning original H3: {:x}",
+    //   h.0
+    // );
     return Ok(h);
   }
 
   let mut parent_h = h;
-  // <<< ADDED [Debug Println Initial parent_h] >>>
-  println!("  cell_to_parent: Initial parent_h (copy of input): {:x}", parent_h.0);
-  // <<< ADDED [Debug Println Initial parent_h] END >>>
+  // println!("  cell_to_parent: Initial parent_h (copy of input): {:x}", parent_h.0);
 
   set_resolution(&mut parent_h, parent_res);
-  // <<< ADDED [Debug Println After set_resolution] >>>
-  println!(
-    "  cell_to_parent: After set_resolution({}), parent_h: {:x}",
-    parent_res, parent_h.0
-  );
-  // <<< ADDED [Debug Println After set_resolution] END >>>
+  
+  // println!(
+  //   "  cell_to_parent: After set_resolution({}), parent_h: {:x}",
+  //   parent_res, parent_h.0
+  // );
 
   // Set digits from parent_res + 1 through child_res to InvalidDigit (7).
   // Digits from child_res + 1 to MAX_H3_RES were already 7 in the valid child `h`.
   for r_digit_to_invalidate in (parent_res + 1)..=child_res {
-    // <<< ADDED [Debug Println Loop Start] >>>
     // Get the digit *before* invalidating it for accurate logging
     let original_digit_at_r = get_index_digit(parent_h, r_digit_to_invalidate);
-    println!(
-      "    cell_to_parent: Invalidating digit for resolution {} (original digit was {:?})",
-      r_digit_to_invalidate, original_digit_at_r
-    );
-    // <<< ADDED [Debug Println Loop Start] END >>>
+    // println!(
+    //   "    cell_to_parent: Invalidating digit for resolution {} (original digit was {:?})",
+    //   r_digit_to_invalidate, original_digit_at_r
+    // );
+    
     set_index_digit(&mut parent_h, r_digit_to_invalidate, Direction::InvalidDigit);
-    // <<< ADDED [Debug Println Loop End] >>>
-    println!(
-      "    cell_to_parent: After invalidating digit for res {}, parent_h is now: {:x}",
-      r_digit_to_invalidate, parent_h.0
-    );
-    // <<< ADDED [Debug Println Loop End] END >>>
+    
+    // println!(
+    //   "    cell_to_parent: After invalidating digit for res {}, parent_h is now: {:x}",
+    //   r_digit_to_invalidate, parent_h.0
+    // );
   }
 
-  // <<< ADDED [Debug Println Final parent_h] >>>
-  println!("---- cell_to_parent ---- END Final parent_h: {:x}", parent_h.0);
-  // <<< ADDED [Debug Println Final parent_h] END >>>
+  // println!("---- cell_to_parent ---- END Final parent_h: {:x}", parent_h.0);
   Ok(parent_h)
 }
 

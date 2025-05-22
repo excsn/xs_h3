@@ -257,18 +257,18 @@ pub(crate) fn h3_neighbor_rotations(
 /// if the cells are not neighbors.
 // This is `directionForNeighbor` in C.
 pub(crate) fn direction_for_neighbor(origin: H3Index, destination: H3Index) -> Direction {
-  eprintln!(
-    "  DI_FOR_NB: direction_for_neighbor called with origin=0x{:x}, destination=0x{:x}",
-    origin.0, destination.0
-  );
+  // eprintln!(
+  //   "  DI_FOR_NB: direction_for_neighbor called with origin=0x{:x}, destination=0x{:x}",
+  //   origin.0, destination.0
+  // );
 
   if origin == destination {
-    eprintln!("    DI_FOR_NB: Origin and destination are the same. Returning Center.");
+    // eprintln!("    DI_FOR_NB: Origin and destination are the same. Returning Center.");
     return Direction::Center;
   }
 
   let is_pent = is_pentagon(origin); // is_pentagon from h3_index::inspection
-  eprintln!("    DI_FOR_NB: is_pentagon(origin) = {}", is_pent);
+  // eprintln!("    DI_FOR_NB: is_pentagon(origin) = {}", is_pent);
 
   let start_dir_u8: u8 = if is_pent {
     Direction::JAxes as u8
@@ -282,33 +282,33 @@ pub(crate) fn direction_for_neighbor(origin: H3Index, destination: H3Index) -> D
       Ok(d) => d,
       Err(_) => continue, // Should not happen if loop is 1..=6 or 2..=6
     };
-    eprintln!("    DI_FOR_NB: Testing direction {:?}", direction);
+    // eprintln!("    DI_FOR_NB: Testing direction {:?}", direction);
 
     let mut neighbor: H3Index = H3_NULL; // Initialize
     let mut rotations = 0; // Does not affect which neighbor is found, only its final orientation relative to origin's system
 
     let neighbor_result = h3_neighbor_rotations(origin, direction, &mut rotations, &mut neighbor);
 
-    eprintln!(
-      "    DI_FOR_NB: h3_neighbor_rotations(0x{:x}, {:?}, ...) yielded H3 = 0x{:x}, rotations_out = {}, err = {:?}",
-      origin.0, direction, neighbor.0, rotations, neighbor_result
-    );
+    // eprintln!(
+    //   "    DI_FOR_NB: h3_neighbor_rotations(0x{:x}, {:?}, ...) yielded H3 = 0x{:x}, rotations_out = {}, err = {:?}",
+    //   origin.0, direction, neighbor.0, rotations, neighbor_result
+    // );
 
     if neighbor_result.is_ok() && neighbor == destination {
-      eprintln!("    DI_FOR_NB: FOUND neighbor in direction {:?}", direction);
+      // eprintln!("    DI_FOR_NB: FOUND neighbor in direction {:?}", direction);
       return direction;
     } else {
       if neighbor_result.is_err() && neighbor_result != Err(H3Error::Pentagon) {
         // Log unexpected errors from h3_neighbor_rotations
-        eprintln!(
-          "    DI_FOR_NB: h3_neighbor_rotations errored unexpectedly for direction {:?}: {:?}",
-          direction, neighbor_result
-        );
+        // eprintln!(
+        //   "    DI_FOR_NB: h3_neighbor_rotations errored unexpectedly for direction {:?}: {:?}",
+        //   direction, neighbor_result
+        // );
       }
     }
   }
 
-  eprintln!("    DI_FOR_NB: Did not find direct neighbor after checking all valid directions.");
+  // eprintln!("    DI_FOR_NB: Did not find direct neighbor after checking all valid directions.");
   Direction::InvalidDigit
 }
 
@@ -353,10 +353,10 @@ pub fn are_neighbor_cells(origin: H3Index, destination: H3Index) -> Result<bool,
   }
   let dir = direction_for_neighbor(origin, destination);
   let result = dir != Direction::InvalidDigit;
-  eprintln!(
-    "ARE_NEIGHBOR_CELLS_DEBUG: origin={:x}, dest={:x}, dir_found={:?}, result={}",
-    origin.0, destination.0, dir, result
-  );
+  // eprintln!(
+  //   "ARE_NEIGHBOR_CELLS_DEBUG: origin={:x}, dest={:x}, dir_found={:?}, result={}",
+  //   origin.0, destination.0, dir, result
+  // );
   // This relies heavily on the base cells
   Ok(direction_for_neighbor(origin, destination) != Direction::InvalidDigit)
   // From C tests, H3 library's _areNeighborCells function *always* calculates

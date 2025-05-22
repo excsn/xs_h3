@@ -263,16 +263,16 @@ mod tests {
     assert_eq!(path[(path_size - 1) as usize], end, "Path ends with end index");
 
     for i in 1..(path_size as usize) {
-      eprintln!(
-        "PATH_TEST: Checking path[i]={:x}, path[i-1]={:x}",
-        path[i].0,
-        path[i - 1].0
-      );
+      // eprintln!(
+      //   "PATH_TEST: Checking path[i]={:x}, path[i-1]={:x}",
+      //   path[i].0,
+      //   path[i - 1].0
+      // );
       let are_direct_neighbors_res = are_neighbor_cells(path[i], path[i - 1]);
-      eprintln!(
-        "PATH_TEST: are_neighbor_cells(path[i], path[i-1]) result: {:?}",
-        are_direct_neighbors_res
-      );
+      // eprintln!(
+      //   "PATH_TEST: are_neighbor_cells(path[i], path[i-1]) result: {:?}",
+      //   are_direct_neighbors_res
+      // );
       assert!(
         are_direct_neighbors_res.unwrap_or(false), // Fail if error or false
         "Index {:x} is NOT neighbor of previous {:x}",
@@ -282,16 +282,16 @@ mod tests {
 
       if i > 1 {
         // This means i starts from 2 for this block
-        eprintln!(
-          "PATH_TEST: Checking zigzag for path[i]={:x}, path[i-2]={:x}",
-          path[i].0,
-          path[i - 2].0
-        );
+        // eprintln!(
+        //   "PATH_TEST: Checking zigzag for path[i]={:x}, path[i-2]={:x}",
+        //   path[i].0,
+        //   path[i - 2].0
+        // );
         let are_zigzag_neighbors_res = are_neighbor_cells(path[i], path[i - 2]);
-        eprintln!(
-          "PATH_TEST: are_neighbor_cells(path[i], path[i-2]) result: {:?}",
-          are_zigzag_neighbors_res
-        );
+        // eprintln!(
+        //   "PATH_TEST: are_neighbor_cells(path[i], path[i-2]) result: {:?}",
+        //   are_zigzag_neighbors_res
+        // );
         assert!(
           !are_zigzag_neighbors_res.unwrap_or(true), // Fail if error or true
           "Index {:x} IS incorrectly a neighbor of {:x} (should not be on a straight line path)",
@@ -342,11 +342,11 @@ mod tests {
     let h1 = H3Index(0x855943cbfffffff); // path[i-2] in failing test, also a cell from grid_path test
     let h2 = H3Index(0x855943d3fffffff); // path[i] in failing test, also a cell from grid_path test
 
-    eprintln!("Test 1: H1=0x{:x}, H2=0x{:x}", h1.0, h2.0);
+    // eprintln!("Test 1: H1=0x{:x}, H2=0x{:x}", h1.0, h2.0);
     let distance_result1 = grid_distance(h1, h2);
-    eprintln!("  grid_distance(H1, H2) = {:?}", distance_result1);
+    // eprintln!("  grid_distance(H1, H2) = {:?}", distance_result1);
     let are_neighbors_result1 = are_neighbor_cells(h1, h2);
-    eprintln!("  are_neighbor_cells(H1, H2) = {:?}", are_neighbors_result1);
+    // eprintln!("  are_neighbor_cells(H1, H2) = {:?}", are_neighbors_result1);
 
     match (distance_result1, are_neighbors_result1) {
       (Ok(dist), Ok(neighbors_bool)) => {
@@ -380,17 +380,17 @@ mod tests {
                                                    // C test expects 2. This test now aligns with Rust's output.
     let expected_dist_far_pair = 3;
 
-    eprintln!(
-      "Test 2: H_FAR1_VALID=0x{:x}, H_FAR2_VALID=0x{:x}",
-      h_far1_valid.0, h_far2_valid.0
-    );
+    // eprintln!(
+    //   "Test 2: H_FAR1_VALID=0x{:x}, H_FAR2_VALID=0x{:x}",
+    //   h_far1_valid.0, h_far2_valid.0
+    // );
     let distance_result2 = grid_distance(h_far1_valid, h_far2_valid);
-    eprintln!("  grid_distance(VALID_FAR1, VALID_FAR2) = {:?}", distance_result2);
+    // eprintln!("  grid_distance(VALID_FAR1, VALID_FAR2) = {:?}", distance_result2);
     let are_neighbors_result2 = are_neighbor_cells(h_far1_valid, h_far2_valid);
-    eprintln!(
-      "  are_neighbor_cells(VALID_FAR1, VALID_FAR2) = {:?}",
-      are_neighbors_result2
-    );
+    // eprintln!(
+    //   "  are_neighbor_cells(VALID_FAR1, VALID_FAR2) = {:?}",
+    //   are_neighbors_result2
+    // );
 
     assert_eq!(
       distance_result2,
@@ -438,7 +438,7 @@ mod tests {
     let mut rj = lround_c99_style_for_test(0.0) as i32;
     let mut rk = lround_c99_style_for_test(-2.5) as i32;
     // Initial round: ri=3, rj=0, rk=-3. Sum=0. No correction needed.
-    eprintln!("C-style lround (2.5, 0, -2.5) -> ({}, {}, {})", ri, rj, rk);
+    // eprintln!("C-style lround (2.5, 0, -2.5) -> ({}, {}, {})", ri, rj, rk);
     assert!(
       ri == 3 && rj == 0 && rk == -3,
       "lround_c99_style ties 2.5 to 3, -2.5 to -3"
@@ -448,7 +448,7 @@ mod tests {
     rj = lround_c99_style_for_test(0.0) as i32;
     rk = lround_c99_style_for_test(-3.5) as i32;
     // Initial round: ri=4, rj=0, rk=-4. Sum=0.
-    eprintln!("C-style lround (3.5, 0, -3.5) -> ({}, {}, {})", ri, rj, rk);
+    // eprintln!("C-style lround (3.5, 0, -3.5) -> ({}, {}, {})", ri, rj, rk);
     assert!(
       ri == 4 && rj == 0 && rk == -4,
       "lround_c99_style ties 3.5 to 4, -3.5 to -4"
@@ -510,10 +510,10 @@ mod tests {
                                    // _ijk_normalize({-1,2,0}) -> {0,3,1}
 
     let expected_rt = CoordIJK { i: 0, j: 3, k: 1 };
-    eprintln!(
-      "IJK+ {:?} -> Cube {:?} -> IJK+ {:?}",
-      ijk_plus_orig, cube_coords, ijk_plus_rt
-    );
+    // eprintln!(
+    //   "IJK+ {:?} -> Cube {:?} -> IJK+ {:?}",
+    //   ijk_plus_orig, cube_coords, ijk_plus_rt
+    // );
     assert_eq!(
       ijk_plus_rt, expected_rt,
       "Cube to IJK+ conversion leads to different representation"
@@ -529,13 +529,13 @@ mod tests {
     let h_start = H3Index(0x855943cbfffffff); // path[i-2] in failing test
     let h_end = H3Index(0x85594303fffffff); // path[i] in failing test
 
-    eprintln!("Specific Pair Test: H_START = {:x}, H_END = {:x}", h_start.0, h_end.0);
+    // eprintln!("Specific Pair Test: H_START = {:x}, H_END = {:x}", h_start.0, h_end.0);
 
     let distance_result = grid_distance(h_start, h_end);
-    eprintln!("  grid_distance(H_START, H_END) = {:?}", distance_result);
+    // eprintln!("  grid_distance(H_START, H_END) = {:?}", distance_result);
 
     let are_neighbors_result = are_neighbor_cells(h_start, h_end);
-    eprintln!("  are_neighbor_cells(H_START, H_END) = {:?}", are_neighbors_result);
+    // eprintln!("  are_neighbor_cells(H_START, H_END) = {:?}", are_neighbors_result);
 
     // Assertions based on what *should* be true if one is a direct neighbor of other
     match (distance_result, are_neighbors_result) {

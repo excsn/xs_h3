@@ -939,21 +939,21 @@ mod tests {
     assert_eq!(crate::h3_index::get_index_digit(h_overage, 1), Direction::Center);
     assert_eq!(crate::h3_index::get_index_digit(h_overage, 2), Direction::KAxes); // This assertion should now pass
 
-    println!(
-      "Testing H3Index: {:x} (BC={}, R={}, D1={:?}, D2={:?})",
-      h_overage.0,
-      get_base_cell(h_overage),
-      get_resolution(h_overage),
-      get_index_digit(h_overage, 1),
-      get_index_digit(h_overage, 2)
-    );
+    // println!(
+    //   "Testing H3Index: {:x} (BC={}, R={}, D1={:?}, D2={:?})",
+    //   h_overage.0,
+    //   get_base_cell(h_overage),
+    //   get_resolution(h_overage),
+    //   get_index_digit(h_overage, 1),
+    //   get_index_digit(h_overage, 2)
+    // );
 
     let mut fijk_overage = FaceIJK::default();
     let h3_to_fijk_result = _h3_to_face_ijk(h_overage, &mut fijk_overage);
-    println!(
-      "_h3_to_face_ijk result: {:?}, fijk_overage: {:?}",
-      h3_to_fijk_result, fijk_overage
-    );
+    // println!(
+    //   "_h3_to_face_ijk result: {:?}, fijk_overage: {:?}",
+    //   h3_to_fijk_result, fijk_overage
+    // );
     assert!(h3_to_fijk_result.is_ok());
 
     assert_eq!(
@@ -982,27 +982,27 @@ mod tests {
       face: 0,
       coord: CoordIJK { i: 2, j: 2, k: 1 },
     };
-    println!("Testing Fijk overage input: {:?}", fijk_input_overage);
+    // println!("Testing Fijk overage input: {:?}", fijk_input_overage);
     let h3_from_overage_input = _face_ijk_to_h3(&fijk_input_overage, 0);
     assert_ne!(
       h3_from_overage_input, H3_NULL,
       "Expected valid H3 from overage Fijk input {:?}. Got H3_NULL.",
       fijk_input_overage
     );
-    println!("  _face_ijk_to_h3 produced H3: {:x}", h3_from_overage_input.0);
+    // println!("  _face_ijk_to_h3 produced H3: {:x}", h3_from_overage_input.0);
 
     let mut fijk_rt_from_overage = FaceIJK::default();
     let h3_to_fijk_overage_result = _h3_to_face_ijk(h3_from_overage_input, &mut fijk_rt_from_overage);
-    println!(
-      "  _h3_to_face_ijk for H3 {:x} result: {:?}, fijk: {:?}",
-      h3_from_overage_input.0, h3_to_fijk_overage_result, fijk_rt_from_overage
-    );
+    // println!(
+    //   "  _h3_to_face_ijk for H3 {:x} result: {:?}, fijk: {:?}",
+    //   h3_from_overage_input.0, h3_to_fijk_overage_result, fijk_rt_from_overage
+    // );
     assert!(h3_to_fijk_overage_result.is_ok());
 
     let bc_of_h3 = get_base_cell(h3_from_overage_input);
-    println!("  Base cell of H3 {:x} is {}", h3_from_overage_input.0, bc_of_h3);
+    // println!("  Base cell of H3 {:x} is {}", h3_from_overage_input.0, bc_of_h3);
     let canonical_home_fijk = BASE_CELL_DATA[bc_of_h3 as usize].home_fijk;
-    println!("  Canonical home Fijk for BC {} is {:?}", bc_of_h3, canonical_home_fijk);
+    // println!("  Canonical home Fijk for BC {} is {:?}", bc_of_h3, canonical_home_fijk);
 
     assert_eq!(
       fijk_rt_from_overage.face, canonical_home_fijk.face,

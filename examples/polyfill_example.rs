@@ -6,7 +6,7 @@ use xs_h3::{
 };
 
 fn main() -> Result<(), H3Error> {
-  println!("--- Polyfill Example ---");
+  // println!("--- Polyfill Example ---");
 
   // Define a simple square polygon (e.g., around a park in SF)
   // Note: For GeoJSON, the first and last vertex of a loop must be the same.
@@ -41,16 +41,16 @@ fn main() -> Result<(), H3Error> {
   let res = 10; // Target H3 resolution for polyfill
   let flags = ContainmentMode::Center as u32; // Polyfill cells whose centers are contained
 
-  println!("Polygon defined with {} vertices.", polygon.geoloop.num_verts);
-  println!("Target H3 resolution: {}", res);
-  println!("Containment mode: Cell centers");
+  // println!("Polygon defined with {} vertices.", polygon.geoloop.num_verts);
+  // println!("Target H3 resolution: {}", res);
+  // println!("Containment mode: Cell centers");
 
   // 1. Determine max number of cells needed for the output buffer
   let max_cells = max_polygon_to_cells_size(&polygon, res, flags)?;
-  println!("Max H3 cells estimated for polyfill: {}", max_cells);
+  // println!("Max H3 cells estimated for polyfill: {}", max_cells);
 
   if max_cells == 0 {
-    println!("No cells estimated, polygon might be too small or empty for this resolution.");
+    // println!("No cells estimated, polygon might be too small or empty for this resolution.");
     return Ok(());
   }
 
@@ -61,22 +61,22 @@ fn main() -> Result<(), H3Error> {
   polygon_to_cells(&polygon, res, flags, &mut polyfill_cells)?;
 
   // 4. Process the results
-  println!(
-    "H3 cells covering the polygon ({} actual cells found):",
-    polyfill_cells.iter().filter(|&&h| h != H3_NULL).count()
-  );
+  // println!(
+  //   "H3 cells covering the polygon ({} actual cells found):",
+  //   polyfill_cells.iter().filter(|&&h| h != H3_NULL).count()
+  // );
   for (i, cell_h3) in polyfill_cells.iter().enumerate() {
     if *cell_h3 != H3_NULL {
-      println!(
-        "  Cell {}: {} (Hex: {:x})",
-        i,
-        xs_h3::h3_to_string_alloc(*cell_h3), // Use crate-level import
-        cell_h3.0
-      );
+      // println!(
+      //   "  Cell {}: {} (Hex: {:x})",
+      //   i,
+      //   xs_h3::h3_to_string_alloc(*cell_h3), // Use crate-level import
+      //   cell_h3.0
+      // );
     } else {
       // If H3_NULL is found before the end, it means fewer cells were needed than max_cells
       // This is expected as max_polygon_to_cells_size is an overestimate.
-      println!("  (Output buffer contains H3_NULL from index {} onwards)", i);
+      // println!("  (Output buffer contains H3_NULL from index {} onwards)", i);
       break;
     }
   }
@@ -87,11 +87,11 @@ fn main() -> Result<(), H3Error> {
   if max_cells_overlap > 0 {
     let mut polyfill_cells_overlap = vec![H3_NULL; max_cells_overlap as usize];
     polygon_to_cells(&polygon, res, flags_overlap_bbox, &mut polyfill_cells_overlap)?;
-    println!(
-      "\nPolyfill with OverlappingBbox mode found {} cells (max est: {}).",
-      polyfill_cells_overlap.iter().filter(|&&h| h != H3_NULL).count(),
-      max_cells_overlap
-    );
+    // println!(
+    //   "\nPolyfill with OverlappingBbox mode found {} cells (max est: {}).",
+    //   polyfill_cells_overlap.iter().filter(|&&h| h != H3_NULL).count(),
+    //   max_cells_overlap
+    // );
   }
 
   Ok(())

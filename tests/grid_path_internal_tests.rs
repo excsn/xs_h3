@@ -203,19 +203,19 @@ fn test_step7_compare_rust_rounded_axial_with_c_implied_axial() {
   // Convert this local IJK+ to axial to see what C's _cubeRound must have produced
   let mut c_implied_axial_n1 = local_ijk_c1;
   ijk_to_cube(&mut c_implied_axial_n1);
-  eprintln!(
-    "C path[1] (0x{:x}) -> local IJK+ {:?} -> implied axial {:?}",
-    C_PATH_N1.0, local_ijk_c1, c_implied_axial_n1
-  );
+  // eprintln!(
+  //   "C path[1] (0x{:x}) -> local IJK+ {:?} -> implied axial {:?}",
+  //   C_PATH_N1.0, local_ijk_c1, c_implied_axial_n1
+  // );
 
   let mut local_ijk_c2 = CoordIJK::default();
   assert!(cell_to_local_ijk(START_H3_FAIL_CASE, C_PATH_N2, &mut local_ijk_c2).is_ok());
   let mut c_implied_axial_n2 = local_ijk_c2;
   ijk_to_cube(&mut c_implied_axial_n2);
-  eprintln!(
-    "C path[2] (0x{:x}) -> local IJK+ {:?} -> implied axial {:?}",
-    C_PATH_N2.0, local_ijk_c2, c_implied_axial_n2
-  );
+  // eprintln!(
+  //   "C path[2] (0x{:x}) -> local IJK+ {:?} -> implied axial {:?}",
+  //   C_PATH_N2.0, local_ijk_c2, c_implied_axial_n2
+  // );
 
   // THE CRITICAL ASSERTIONS:
   assert_eq!(
@@ -332,10 +332,10 @@ fn test_grid_path_internals_for_failing_case() {
 
   let mut local_ijk_c1 = CoordIJK::default();
   assert!(cell_to_local_ijk(start_h3, c_path1_h3, &mut local_ijk_c1).is_ok());
-  eprintln!(
-    "Local IJK+ for C_path[1] (0x{:x}) relative to start: {:?}",
-    c_path1_h3.0, local_ijk_c1
-  );
+  // eprintln!(
+  //   "Local IJK+ for C_path[1] (0x{:x}) relative to start: {:?}",
+  //   c_path1_h3.0, local_ijk_c1
+  // );
   // Expected local IJK+ for C_path1 should be a distance 1 vector, e.g., {1,0,0} or similar after norm.
   // From the C output of h3Distance for start and C_path[1], distance is 1.
   // If C_path[1] is {i:X, j:Y, k:Z} (axial from its _cubeRound), then after conversion to local IJK+
@@ -343,19 +343,19 @@ fn test_grid_path_internals_for_failing_case() {
 
   let mut local_ijk_c2 = CoordIJK::default();
   assert!(cell_to_local_ijk(start_h3, c_path2_h3, &mut local_ijk_c2).is_ok());
-  eprintln!(
-    "Local IJK+ for C_path[2] (0x{:x}) relative to start: {:?}",
-    c_path2_h3.0, local_ijk_c2
-  );
+  // eprintln!(
+  //   "Local IJK+ for C_path[2] (0x{:x}) relative to start: {:?}",
+  //   c_path2_h3.0, local_ijk_c2
+  // );
 
   // Convert these to axial to see what C's _cubeRound *must have* produced for n=1 and n=2
   let mut axial_from_local_c1 = local_ijk_c1;
   ijk_to_cube(&mut axial_from_local_c1);
-  eprintln!("Axial for C_path[1]'s local IJK+: {:?}", axial_from_local_c1);
+  // eprintln!("Axial for C_path[1]'s local IJK+: {:?}", axial_from_local_c1);
 
   let mut axial_from_local_c2 = local_ijk_c2;
   ijk_to_cube(&mut axial_from_local_c2);
-  eprintln!("Axial for C_path[2]'s local IJK+: {:?}", axial_from_local_c2);
+  // eprintln!("Axial for C_path[2]'s local IJK+: {:?}", axial_from_local_c2);
 
   // Now, compare `axial_from_local_c1` with Rust's `rounded_axial_n1` (which was {-1,-1,2})
   // And `axial_from_local_c2` with Rust's `rounded_axial_n2` (which was {-2,-2,4})

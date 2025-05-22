@@ -11,17 +11,23 @@ keywords = ["h3", "geospatial", "gis", "index", "uber"]
 categories = ["algorithms", "data-structures", "science::geo"]
 
 [dependencies]
-# smallvec = { version = "1.11", features = ["const_generics"] } # For CellBoundary if optimizing stack allocation later
-# cfg-if = "1.0" # For conditional compilation (e.g., no_std features)
+# smallvec = { version = "^1.11", features = ["const_generics"] } # For CellBoundary if optimizing stack allocation later
+serde = { version = "^1", optional = true, default-features = false, features = ["derive"] }
+serde_repr = { version = "^0", optional = true, default-features = false }
 
 [dev-dependencies]
-# criterion = { version = "0.5", features = ["html_reports"] } # For benchmarking later
+criterion = { version = "^0.5", features = ["html_reports"] } # For benchmarking later
 # proptest = "1.2" # For property-based testing later
+serde_json = "^1"
 
 [features]
-# default = []
-# serde = ["dep:serde"] # Example for serde support later
+default = ["serde"]
+serde = ["dep:serde", "dep:serde_repr"]
 
-# [[dependency.serde]] # If enabling serde feature
-# version = "1.0"
-# optional = true
+[[bench]]
+name = "indexing_benches" # This will be benches/indexing_benches.rs
+harness = false           # Required for criterion
+
+[[bench]]
+name = "polyfill_benches" # This will be benches/polyfill_benches.rs
+harness = false           # Required for criterion

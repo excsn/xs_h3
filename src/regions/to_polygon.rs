@@ -16,7 +16,18 @@ use crate::{
 use std::collections::HashMap; // Might be useful for _hashVertex alternative
 use std::hash::{Hash, Hasher};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 // --- VertexGraph related structures and functions ---
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct PolygonRust {
+  pub outer: Vec<LatLng>,
+  pub holes: Vec<Vec<LatLng>>,
+}
+pub type MultiPolygonRust = Vec<PolygonRust>;
 
 // Rust equivalent of C's VertexNode (using Box for linked-list like structure)
 #[derive(Debug, Clone)]
@@ -211,13 +222,6 @@ impl Drop for VertexGraph {
   }
 }
 
-#[derive(Debug)]
-pub struct PolygonRust {
-  pub outer: Vec<LatLng>,
-  pub holes: Vec<Vec<LatLng>>,
-}
-pub type MultiPolygonRust = Vec<PolygonRust>;
-
 fn h3_set_to_vertex_graph(h3_set: &[H3Index], graph: &mut VertexGraph) -> Result<(), H3Error> {
   if h3_set.is_empty() {
     return Ok(());
@@ -263,10 +267,10 @@ fn h3_set_to_vertex_graph(h3_set: &[H3Index], graph: &mut VertexGraph) -> Result
           // The C logic implies this won't happen due to the remove-first strategy.
           // However, if add_vertex_node also checks for duplicates, it might return false here.
           // This indicates a logic error or an unexpected graph state.
-          eprintln!(
-            "Warning: Tried to add edge {:?}->{:?} that was already present after failing to remove reversed.",
-            from_vtx, to_vtx
-          );
+          // eprintln!(
+          //   "Warning: Tried to add edge {:?}->{:?} that was already present after failing to remove reversed.",
+          //   from_vtx, to_vtx
+          // );
         }
       }
     }
@@ -307,10 +311,10 @@ fn vertex_graph_to_multi_polygon_rust(graph: &mut VertexGraph) -> Result<MultiPo
         current_loop_vec.push(current_to_vtx); // _found_from_vtx is current_to_vtx
         current_to_vtx = found_to_vtx;
       } else {
-        eprintln!(
-          "Could not find next edge starting with {:?} for loop started at {:?}. Graph size: {}. Partial loop: {:?}",
-          current_to_vtx, loop_start_vtx, graph.size, current_loop_vec
-        );
+        // eprintln!(
+        //   "Could not find next edge starting with {:?} for loop started at {:?}. Graph size: {}. Partial loop: {:?}",
+        //   current_to_vtx, loop_start_vtx, graph.size, current_loop_vec
+        // );
         return Err(H3Error::Failed);
       }
 
@@ -319,7 +323,7 @@ fn vertex_graph_to_multi_polygon_rust(graph: &mut VertexGraph) -> Result<MultiPo
       }
       if current_loop_vec.len() > graph.num_buckets * MAX_CELL_BNDRY_VERTS {
         // Safety break
-        eprintln!("Loop tracing exceeded maximum possible edges.");
+        // eprintln!("Loop tracing exceeded maximum possible edges.");
         return Err(H3Error::Failed);
       }
     }
@@ -423,10 +427,10 @@ fn vertex_graph_to_multi_polygon_rust(graph: &mut VertexGraph) -> Result<MultiPo
   }
 
   if !still_unassigned_holes.is_empty() {
-    eprintln!(
-      "Warning: {} holes remained unassigned and were discarded.",
-      still_unassigned_holes.len()
-    );
+    // eprintln!(
+    //   "Warning: {} holes remained unassigned and were discarded.",
+    //   still_unassigned_holes.len()
+    // );
     // H3 C's normalizeMultiPolygon returns E_FAILED if a hole cannot be assigned.
     // return Err(H3Error::Failed);
     // For testing donut where outer/inner are separate, we might not want to fail here yet.

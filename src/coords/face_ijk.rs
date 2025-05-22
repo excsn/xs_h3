@@ -326,19 +326,19 @@ pub enum Overage {
 
 #[inline]
 pub(crate) fn _geo_to_closest_face(g: &LatLng, face: &mut i32, sqd: &mut f64) {
-  println!(
-    "---- _geo_to_closest_face ---- START Input Geo: {{lat:{:.10}, lng:{:.10}}}",
-    g.lat, g.lng
-  );
+  // println!(
+  //   "---- _geo_to_closest_face ---- START Input Geo: {{lat:{:.10}, lng:{:.10}}}",
+  //   g.lat, g.lng
+  // );
   let mut v3d = Vec3d::default();
   _geo_to_vec3d(g, &mut v3d);
-  println!(
-    "  Converted to v3d: {{x:{:.10}, y:{:.10}, z:{:.10}}}",
-    v3d.x, v3d.y, v3d.z
-  );
+  // println!(
+  //   "  Converted to v3d: {{x:{:.10}, y:{:.10}, z:{:.10}}}",
+  //   v3d.x, v3d.y, v3d.z
+  // );
   *face = 0;
   *sqd = 5.0;
-  println!("  Initial: best_face={}, min_sqd={:.10}", *face, *sqd);
+  // println!("  Initial: best_face={}, min_sqd={:.10}", *face, *sqd);
   for f_idx in 0..(NUM_ICOSA_FACES as usize) {
     let current_face_center_v3d = &FACE_CENTER_POINT[f_idx];
     let sqdt_to_current_face = _point_square_dist(current_face_center_v3d, &v3d);
@@ -347,10 +347,10 @@ pub(crate) fn _geo_to_closest_face(g: &LatLng, face: &mut i32, sqd: &mut f64) {
       *sqd = sqdt_to_current_face;
     }
   }
-  println!(
-    "---- _geo_to_closest_face ---- END Final chosen face: {}, sqd: {:.10}",
-    *face, *sqd
-  );
+  // println!(
+  //   "---- _geo_to_closest_face ---- END Final chosen face: {}, sqd: {:.10}",
+  //   *face, *sqd
+  // );
 }
 
 #[inline]
@@ -381,78 +381,78 @@ pub(crate) fn _geo_to_hex2d(g: &LatLng, res: i32, face: &mut i32, v: &mut Vec2d)
 
 #[inline]
 pub(crate) fn _hex2d_to_geo(v: &Vec2d, face_idx: i32, res: i32, substrate: bool, g: &mut LatLng) {
-  println!(
-    "--- _hex2d_to_geo --- START Input Vec2d: {{x:{:.10}, y:{:.10}}}, face_idx: {}, res: {}, substrate: {}",
-    v.x, v.y, face_idx, res, substrate
-  );
+  // println!(
+  //   "--- _hex2d_to_geo --- START Input Vec2d: {{x:{:.10}, y:{:.10}}}, face_idx: {}, res: {}, substrate: {}",
+  //   v.x, v.y, face_idx, res, substrate
+  // );
   let r_hex2d_at_input_res = _v2d_mag(v);
-  println!("  r_hex2d_at_input_res (_v2d_mag(v)): {:.10}", r_hex2d_at_input_res);
+  // println!("  r_hex2d_at_input_res (_v2d_mag(v)): {:.10}", r_hex2d_at_input_res);
   if r_hex2d_at_input_res < EPSILON {
     *g = FACE_CENTER_GEO[face_idx as usize];
-    println!("  r_hex2d_at_input_res < EPSILON. --- _hex2d_to_geo --- END");
+    // println!("  r_hex2d_at_input_res < EPSILON. --- _hex2d_to_geo --- END");
     return;
   }
   let theta_hex2d = v.y.atan2(v.x);
-  println!("  theta_hex2d (atan2(v.y, v.x)): {:.10}", theta_hex2d);
+  // println!("  theta_hex2d (atan2(v.y, v.x)): {:.10}", theta_hex2d);
   let mut r_hex2d_at_res0 = r_hex2d_at_input_res;
   for i_res_scale in 0..res {
     let old_r_hex2d = r_hex2d_at_res0;
     r_hex2d_at_res0 *= M_RSQRT7;
-    println!(
-      "  Res scaling loop {}: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
-      i_res_scale, old_r_hex2d, r_hex2d_at_res0, M_RSQRT7
-    );
+    // println!(
+    //   "  Res scaling loop {}: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
+    //   i_res_scale, old_r_hex2d, r_hex2d_at_res0, M_RSQRT7
+    // );
   }
   if substrate {
     let old_r_hex2d = r_hex2d_at_res0;
     r_hex2d_at_res0 *= M_ONETHIRD;
-    println!(
-      "  Substrate scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_ONETHIRD: {:.10})",
-      old_r_hex2d, r_hex2d_at_res0, M_ONETHIRD
-    );
+    // println!(
+    //   "  Substrate scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_ONETHIRD: {:.10})",
+    //   old_r_hex2d, r_hex2d_at_res0, M_ONETHIRD
+    // );
     if crate::h3_index::is_resolution_class_iii(res) {
       let old_r_hex2d_substrate_class3 = r_hex2d_at_res0;
       r_hex2d_at_res0 *= M_RSQRT7;
-      println!(
-        "  Substrate Class III scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
-        old_r_hex2d_substrate_class3, r_hex2d_at_res0, M_RSQRT7
-      );
+      // println!(
+      //   "  Substrate Class III scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
+      //   old_r_hex2d_substrate_class3, r_hex2d_at_res0, M_RSQRT7
+      // );
     }
   }
   let r_gnomonic = r_hex2d_at_res0 * RES0_U_GNOMONIC;
-  println!(
-    "  r_gnomonic (r_hex2d_at_res0 * RES0_U_GNOMONIC): {:.10} (RES0_U_GNOMONIC: {:.10})",
-    r_gnomonic, RES0_U_GNOMONIC
-  );
+  // println!(
+  //   "  r_gnomonic (r_hex2d_at_res0 * RES0_U_GNOMONIC): {:.10} (RES0_U_GNOMONIC: {:.10})",
+  //   r_gnomonic, RES0_U_GNOMONIC
+  // );
   let r_angular = r_gnomonic.atan();
-  println!(
-    "  r_angular (atan(r_gnomonic)): {:.10} rad ({:.6} deg)",
-    r_angular,
-    crate::latlng::rads_to_degs(r_angular)
-  );
+  // println!(
+  //   "  r_angular (atan(r_gnomonic)): {:.10} rad ({:.6} deg)",
+  //   r_angular,
+  //   crate::latlng::rads_to_degs(r_angular)
+  // );
   let mut theta_for_az = theta_hex2d;
   if !substrate && crate::h3_index::is_resolution_class_iii(res) {
     let old_theta_for_az = theta_for_az;
     theta_for_az = _pos_angle_rads(theta_for_az + M_AP7_ROT_RADS);
-    println!(
-      "  Non-substrate Class III res {}, adjusted theta_for_az from {:.10} to {:.10} (by +M_AP7_ROT_RADS: {:.10})",
-      res, old_theta_for_az, theta_for_az, M_AP7_ROT_RADS
-    );
+    // println!(
+    //   "  Non-substrate Class III res {}, adjusted theta_for_az from {:.10} to {:.10} (by +M_AP7_ROT_RADS: {:.10})",
+    //   res, old_theta_for_az, theta_for_az, M_AP7_ROT_RADS
+    // );
   }
   let az_from_face_center = _pos_angle_rads(FACE_AXES_AZ_RADS_CII[face_idx as usize][0] - theta_for_az);
-  println!(
-    "  Azimuth from face {} center: {:.10} (Face_I_Az: {:.10}, theta_for_az: {:.10})",
-    face_idx, az_from_face_center, FACE_AXES_AZ_RADS_CII[face_idx as usize][0], theta_for_az
-  );
+  // println!(
+  //   "  Azimuth from face {} center: {:.10} (Face_I_Az: {:.10}, theta_for_az: {:.10})",
+  //   face_idx, az_from_face_center, FACE_AXES_AZ_RADS_CII[face_idx as usize][0], theta_for_az
+  // );
   _geo_az_distance_rads(&FACE_CENTER_GEO[face_idx as usize], az_from_face_center, r_angular, g);
-  println!(
-    "  _geo_az_distance_rads output g: {{lat:{:.10}, lng:{:.10}}} (Deg: {:.6}, {:.6})",
-    g.lat,
-    g.lng,
-    crate::latlng::rads_to_degs(g.lat),
-    crate::latlng::rads_to_degs(g.lng)
-  );
-  println!("--- _hex2d_to_geo --- END");
+  // println!(
+  //   "  _geo_az_distance_rads output g: {{lat:{:.10}, lng:{:.10}}} (Deg: {:.6}, {:.6})",
+  //   g.lat,
+  //   g.lng,
+  //   crate::latlng::rads_to_degs(g.lat),
+  //   crate::latlng::rads_to_degs(g.lng)
+  // );
+  // println!("--- _hex2d_to_geo --- END");
 }
 
 #[inline]
@@ -464,28 +464,28 @@ pub(crate) fn _geo_to_face_ijk(g: &LatLng, res: i32, h: &mut FaceIJK) {
 
 #[inline]
 pub(crate) fn _face_ijk_to_geo(h: &FaceIJK, res: i32, g: &mut LatLng) {
-  println!(
-    "--- _face_ijk_to_geo --- Input fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}, res: {}",
-    h.face, h.coord.i, h.coord.j, h.coord.k, res
-  );
+  // println!(
+  //   "--- _face_ijk_to_geo --- Input fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}, res: {}",
+  //   h.face, h.coord.i, h.coord.j, h.coord.k, res
+  // );
   let mut v = Vec2d::default();
   _ijk_to_hex2d(&h.coord, &mut v);
   _hex2d_to_geo(&v, h.face, res, false, g);
-  println!(
-    "--- _face_ijk_to_geo END --- Output Geo: {{lat:{:.10}, lng:{:.10}}} (Deg: {:.6}, {:.6})",
-    g.lat,
-    g.lng,
-    crate::latlng::rads_to_degs(g.lat),
-    crate::latlng::rads_to_degs(g.lng)
-  );
+  // println!(
+  //   "--- _face_ijk_to_geo END --- Output Geo: {{lat:{:.10}, lng:{:.10}}} (Deg: {:.6}, {:.6})",
+  //   g.lat,
+  //   g.lng,
+  //   crate::latlng::rads_to_degs(g.lat),
+  //   crate::latlng::rads_to_degs(g.lng)
+  // );
 }
 
 #[inline]
 pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leading_4: bool, substrate: bool) -> Overage {
-  println!(
-        "---- _adjustOverageClassII ---- START Input fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}, res: {}, pent_leading_4: {}, substrate: {}",
-        fijk.face, fijk.coord.i, fijk.coord.j, fijk.coord.k, res, pent_leading_4, substrate
-    );
+  // println!(
+  //     "---- _adjustOverageClassII ---- START Input fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}, res: {}, pent_leading_4: {}, substrate: {}",
+  //     fijk.face, fijk.coord.i, fijk.coord.j, fijk.coord.k, res, pent_leading_4, substrate
+  // );
 
   let mut overage_status = Overage::NoOverage;
   let ijk = &mut fijk.coord; // Get a mutable reference to the coord part
@@ -495,16 +495,16 @@ pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leadin
   if substrate {
     current_max_dim *= 3;
   }
-  println!("    Calculated current_max_dim: {}", current_max_dim);
+  // println!("    Calculated current_max_dim: {}", current_max_dim);
 
   let coord_sum = ijk.i + ijk.j + ijk.k;
-  println!("    Coord sum: {}", coord_sum);
+  // println!("    Coord sum: {}", coord_sum);
 
   if substrate && (coord_sum == current_max_dim) {
     overage_status = Overage::FaceEdge;
-    println!("    Overage::FaceEdge (sum == current_max_dim for substrate)");
+    // println!("    Overage::FaceEdge (sum == current_max_dim for substrate)");
   } else if coord_sum > current_max_dim {
-    println!("    Overage detected (sum > current_max_dim)");
+    // println!("    Overage detected (sum > current_max_dim)");
     overage_status = Overage::NewFace;
 
     let fijk_orient: &FaceOrientIJK;
@@ -512,15 +512,15 @@ pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leadin
     if ijk.k > 0 {
       if ijk.j > 0 {
         // jk "quadrant"
-        println!("      JK quadrant");
+        // println!("      JK quadrant");
         fijk_orient = &FACE_NEIGHBORS[fijk.face as usize][JK_QUADRANT];
       } else {
         // ik "quadrant" (ijk.j <= 0)
-        println!("      KI quadrant");
+        // println!("      KI quadrant");
         fijk_orient = &FACE_NEIGHBORS[fijk.face as usize][KI_QUADRANT];
 
         if pent_leading_4 {
-          println!("        Pentagon leading 4 adjustment in KI quadrant");
+          // println!("        Pentagon leading 4 adjustment in KI quadrant");
           let mut origin_pent_corner = CoordIJK::default();
           // Use max_dim_base for the pentagon adjustment origin, as C does.
           // current_max_dim here refers to the scaled dimension for substrate.
@@ -529,51 +529,51 @@ pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leadin
           // from a non-substrate context. However, for _adjustPentVertOverage, substrate is true.
           // The critical `maxDim` for pentagon origin is the base class II max dimension.
           _set_ijk(&mut origin_pent_corner, max_dim_base, 0, 0);
-          println!(
-            "          origin_pent_corner (using max_dim_base={}): {{i:{},j:{},k:{}}}",
-            max_dim_base, origin_pent_corner.i, origin_pent_corner.j, origin_pent_corner.k
-          );
+          // println!(
+          //   "          origin_pent_corner (using max_dim_base={}): {{i:{},j:{},k:{}}}",
+          //   max_dim_base, origin_pent_corner.i, origin_pent_corner.j, origin_pent_corner.k
+          // );
 
           let mut tmp_coord = CoordIJK::default();
           _ijk_sub(ijk, &origin_pent_corner, &mut tmp_coord);
-          println!(
-            "          tmp_coord (ijk - origin): {{i:{},j:{},k:{}}}",
-            tmp_coord.i, tmp_coord.j, tmp_coord.k
-          );
+          // println!(
+          //   "          tmp_coord (ijk - origin): {{i:{},j:{},k:{}}}",
+          //   tmp_coord.i, tmp_coord.j, tmp_coord.k
+          // );
 
           _ijk_rotate60_cw(&mut tmp_coord);
-          println!(
-            "          tmp_coord (after rotate60cw): {{i:{},j:{},k:{}}}",
-            tmp_coord.i, tmp_coord.j, tmp_coord.k
-          );
+          // println!(
+          //   "          tmp_coord (after rotate60cw): {{i:{},j:{},k:{}}}",
+          //   tmp_coord.i, tmp_coord.j, tmp_coord.k
+          // );
 
           let ijk_copy_for_add = tmp_coord; // Make a copy because _ijk_add needs immutable source
           _ijk_add(&ijk_copy_for_add, &origin_pent_corner, ijk); // Modifies ijk directly
-          println!(
-            "          ijk (after add origin back): {{i:{},j:{},k:{}}}",
-            ijk.i, ijk.j, ijk.k
-          );
+                                                                 // println!(
+                                                                 //   "          ijk (after add origin back): {{i:{},j:{},k:{}}}",
+                                                                 //   ijk.i, ijk.j, ijk.k
+                                                                 // );
         }
       }
     } else {
       // ij "quadrant" (ijk.k <= 0)
-      println!("      IJ quadrant");
+      // println!("      IJ quadrant");
       fijk_orient = &FACE_NEIGHBORS[fijk.face as usize][IJ_QUADRANT];
     }
 
-    println!(
-      "      fijkOrient selected: new_face={}, translate=({},{}), rot={}",
-      fijk_orient.face, fijk_orient.translate.i, fijk_orient.translate.j, fijk_orient.ccw_rot60
-    );
+    // println!(
+    //   "      fijkOrient selected: new_face={}, translate=({},{}), rot={}",
+    //   fijk_orient.face, fijk_orient.translate.i, fijk_orient.translate.j, fijk_orient.ccw_rot60
+    // );
     fijk.face = fijk_orient.face;
 
     for _i in 0..fijk_orient.ccw_rot60 {
       let ijk_before_rot = *ijk;
       _ijk_rotate60_ccw(ijk);
-      println!(
-        "        Rotated ijk from {{i:{},j:{},k:{}}} to {{i:{},j:{},k:{}}}",
-        ijk_before_rot.i, ijk_before_rot.j, ijk_before_rot.k, ijk.i, ijk.j, ijk.k
-      );
+      // println!(
+      //   "        Rotated ijk from {{i:{},j:{},k:{}}} to {{i:{},j:{},k:{}}}",
+      //   ijk_before_rot.i, ijk_before_rot.j, ijk_before_rot.k, ijk.i, ijk.j, ijk.k
+      // );
     }
 
     let mut trans_vec = fijk_orient.translate;
@@ -581,42 +581,42 @@ pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leadin
     if substrate {
       unit_scale *= 3;
     }
-    println!(
-      "        Translation vector (orig): {{i:{},j:{},k:{}}}, unit_scale: {}",
-      trans_vec.i, trans_vec.j, trans_vec.k, unit_scale
-    );
+    // println!(
+    //   "        Translation vector (orig): {{i:{},j:{},k:{}}}, unit_scale: {}",
+    //   trans_vec.i, trans_vec.j, trans_vec.k, unit_scale
+    // );
     _ijk_scale(&mut trans_vec, unit_scale);
-    println!(
-      "        Translation vector (scaled): {{i:{},j:{},k:{}}}",
-      trans_vec.i, trans_vec.j, trans_vec.k
-    );
+    // println!(
+    //   "        Translation vector (scaled): {{i:{},j:{},k:{}}}",
+    //   trans_vec.i, trans_vec.j, trans_vec.k
+    // );
 
     let ijk_before_translate = *ijk; // Copy for the source argument of _ijk_add
     _ijk_add(&ijk_before_translate, &trans_vec, ijk);
-    println!(
-      "        ijk (after translate): {{i:{},j:{},k:{}}} from {{i:{},j:{},k:{}}}",
-      ijk.i, ijk.j, ijk.k, ijk_before_translate.i, ijk_before_translate.j, ijk_before_translate.k
-    );
+    // println!(
+    //   "        ijk (after translate): {{i:{},j:{},k:{}}} from {{i:{},j:{},k:{}}}",
+    //   ijk.i, ijk.j, ijk.k, ijk_before_translate.i, ijk_before_translate.j, ijk_before_translate.k
+    // );
 
     _ijk_normalize(ijk);
-    println!("        ijk (after normalize): {{i:{},j:{},k:{}}}", ijk.i, ijk.j, ijk.k);
+    // println!("        ijk (after normalize): {{i:{},j:{},k:{}}}", ijk.i, ijk.j, ijk.k);
 
     let new_coord_sum = ijk.i + ijk.j + ijk.k;
-    println!("        New coord sum after transform: {}", new_coord_sum);
+    // println!("        New coord sum after transform: {}", new_coord_sum);
     if substrate && (new_coord_sum == current_max_dim) {
       overage_status = Overage::FaceEdge;
-      println!("    Landed on edge of new face for substrate. Overage::FaceEdge");
+      // println!("    Landed on edge of new face for substrate. Overage::FaceEdge");
     }
     // else overage_status remains NewFace
   } else {
     // overage_status = Overage::NoOverage; // Already initialized
-    println!("    No overage based on sum. Overage::NoOverage");
+    // println!("    No overage based on sum. Overage::NoOverage");
   }
 
-  println!(
-    "---- _adjustOverageClassII ---- END Returning {:?}. Final fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-    overage_status, fijk.face, ijk.i, ijk.j, ijk.k
-  );
+  // println!(
+  //   "---- _adjustOverageClassII ---- END Returning {:?}. Final fijk: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+  //   overage_status, fijk.face, ijk.i, ijk.j, ijk.k
+  // );
   overage_status
 }
 
@@ -640,10 +640,10 @@ pub(crate) fn _adjust_pent_vert_overage(fijk: &mut FaceIJK, res: i32) -> Overage
 
 // Materialized Rust implementation of _face_ijk_pent_to_cell_boundary with pentagon-specific adjacency fix
 pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, length: i32, g: &mut CellBoundary) {
-  println!(
-    "--- _face_ijk_pent_to_cell_boundary --- START Input H: {{face:{}, ijk:{{i:{},j:{},k:{}}}}}, res: {}",
-    h.face, h.coord.i, h.coord.j, h.coord.k, res
-  );
+  // println!(
+  //   "--- _face_ijk_pent_to_cell_boundary --- START Input H: {{face:{}, ijk:{{i:{},j:{},k:{}}}}}, res: {}",
+  //   h.face, h.coord.i, h.coord.j, h.coord.k, res
+  // );
 
   let additional_iteration = if length == NUM_PENT_VERTS as i32 { 1 } else { 0 };
   let mut adj_res = res;
@@ -652,20 +652,20 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
   // Step 1: get substrate verts
   let mut fijk_substrate_verts: [FaceIJK; NUM_PENT_VERTS as usize] = [FaceIJK::default(); NUM_PENT_VERTS as usize];
   _face_ijk_pent_to_verts(&mut center_ijk_substrate, &mut adj_res, &mut fijk_substrate_verts);
-  println!(
-    "  Computed fijk_substrate_verts (adj_res={}). Center on substrate: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-    adj_res,
-    center_ijk_substrate.face,
-    center_ijk_substrate.coord.i,
-    center_ijk_substrate.coord.j,
-    center_ijk_substrate.coord.k
-  );
-  for (i, fv) in fijk_substrate_verts.iter().enumerate() {
-    println!(
-      "    fijk_substrate_verts[{}]: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-      i, fv.face, fv.coord.i, fv.coord.j, fv.coord.k
-    );
-  }
+  // println!(
+  //   "  Computed fijk_substrate_verts (adj_res={}). Center on substrate: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+  //   adj_res,
+  //   center_ijk_substrate.face,
+  //   center_ijk_substrate.coord.i,
+  //   center_ijk_substrate.coord.j,
+  //   center_ijk_substrate.coord.k
+  // );
+  // for (i, fv) in fijk_substrate_verts.iter().enumerate() {
+  //   println!(
+  //     "    fijk_substrate_verts[{}]: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+  //     i, fv.face, fv.coord.i, fv.coord.j, fv.coord.k
+  //   );
+  // }
 
   // init boundary
   g.num_verts = 0;
@@ -677,22 +677,22 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
   // Step 2: loop through vertices
   for vert_idx_loop in 0..(length + additional_iteration) {
     let topological_v_idx = (start + vert_idx_loop) % (NUM_PENT_VERTS as i32);
-    println!(
-      "  Loop vert_idx_loop={}, topological_v_idx={}",
-      vert_idx_loop, topological_v_idx
-    );
+    // println!(
+    //   "  Loop vert_idx_loop={}, topological_v_idx={}",
+    //   vert_idx_loop, topological_v_idx
+    // );
 
     // overage adjustment
     let mut fijk_vert_for_geo = fijk_substrate_verts[topological_v_idx as usize];
-    println!(
-      "    fijk_vert_for_geo (before _adjustPentVertOverage): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-      fijk_vert_for_geo.face, fijk_vert_for_geo.coord.i, fijk_vert_for_geo.coord.j, fijk_vert_for_geo.coord.k
-    );
+    // println!(
+    //   "    fijk_vert_for_geo (before _adjustPentVertOverage): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+    //   fijk_vert_for_geo.face, fijk_vert_for_geo.coord.i, fijk_vert_for_geo.coord.j, fijk_vert_for_geo.coord.k
+    // );
     let _ = _adjust_pent_vert_overage(&mut fijk_vert_for_geo, adj_res);
-    println!(
-      "    fijk_vert_for_geo (after _adjustPentVertOverage): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-      fijk_vert_for_geo.face, fijk_vert_for_geo.coord.i, fijk_vert_for_geo.coord.j, fijk_vert_for_geo.coord.k
-    );
+    // println!(
+    //   "    fijk_vert_for_geo (after _adjustPentVertOverage): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+    //   fijk_vert_for_geo.face, fijk_vert_for_geo.coord.i, fijk_vert_for_geo.coord.j, fijk_vert_for_geo.coord.k
+    // );
 
     // Step 3: distortion insertion for Class III pentagon
     if h3_index::is_resolution_class_iii(res) && vert_idx_loop > 0 {
@@ -702,14 +702,14 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
 
       // Mirror C: choose the other face segment
       let face2 = if prev_face == center_face { curr_face } else { prev_face };
-      println!(
-        "    center={}, last={}, curr={}, face2={} for distortion",
-        center_face, prev_face, curr_face, face2
-      );
+      // println!(
+      //   "    center={}, last={}, curr={}, face2={} for distortion",
+      //   center_face, prev_face, curr_face, face2
+      // );
 
       // Use pentagon-aware adjacency
       let edge_dir = ADJACENT_FACE_DIR[center_face as usize][face2 as usize];
-      println!("    adjacentFaceDir[center][face2] = {}", edge_dir);
+      // println!("    adjacentFaceDir[center][face2] = {}", edge_dir);
 
       // If a valid crossing, project and intersect
       if edge_dir >= 0 && edge_dir < 4 {
@@ -754,7 +754,7 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
         };
         let mut inter = Vec2d::default();
         _v2d_intersect(&prev2d, &curr2d, eA, eB, &mut inter);
-        println!("    Intersection: {{x:{:.4}, y:{:.4}}}", inter.x, inter.y);
+        // println!("    Intersection: {{x:{:.4}, y:{:.4}}}", inter.x, inter.y);
 
         if g.num_verts < MAX_CELL_BNDRY_VERTS {
           _hex2d_to_geo(&inter, center_face, adj_res, true, &mut g.verts[g.num_verts]);
@@ -768,47 +768,47 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
       let mut v2d = Vec2d::default();
       _ijk_to_hex2d(&fijk_vert_for_geo.coord, &mut v2d);
       _hex2d_to_geo(&v2d, fijk_vert_for_geo.face, adj_res, true, &mut g.verts[g.num_verts]);
-      println!(
-        "    Adding topological vertex {} (face {}) at index {}",
-        topological_v_idx, fijk_vert_for_geo.face, g.num_verts
-      );
+      // println!(
+      //   "    Adding topological vertex {} (face {}) at index {}",
+      //   topological_v_idx, fijk_vert_for_geo.face, g.num_verts
+      // );
       g.num_verts += 1;
     }
 
     last_fijk_adjusted_geo = fijk_vert_for_geo;
   }
 
-  println!(
-    "--- _face_ijk_pent_to_cell_boundary --- END Final g.num_verts: {}",
-    g.num_verts
-  );
+  // println!(
+  //   "--- _face_ijk_pent_to_cell_boundary --- END Final g.num_verts: {}",
+  //   g.num_verts
+  // );
 }
 
 pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, length: i32, g: &mut CellBoundary) {
-  println!(
-        "--- _face_ijk_to_cell_boundary --- START Input H: {{face:{}, ijk:{{i:{},j:{},k:{}}}}}, res: {}, start: {}, length: {}",
-        h.face, h.coord.i, h.coord.j, h.coord.k, res, start, length
-    );
+  // println!(
+  //       "--- _face_ijk_to_cell_boundary --- START Input H: {{face:{}, ijk:{{i:{},j:{},k:{}}}}}, res: {}, start: {}, length: {}",
+  //       h.face, h.coord.i, h.coord.j, h.coord.k, res, start, length
+  //   );
 
   let mut adj_res = res;
   let mut center_ijk_on_face = *h;
 
   let mut fijk_verts: [FaceIJK; NUM_HEX_VERTS as usize] = [FaceIJK::default(); NUM_HEX_VERTS as usize];
   _face_ijk_to_verts(&mut center_ijk_on_face, &mut adj_res, &mut fijk_verts);
-  println!(
-    "  Computed fijk_verts (adj_res={}). Center on substrate: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-    adj_res,
-    center_ijk_on_face.face,
-    center_ijk_on_face.coord.i,
-    center_ijk_on_face.coord.j,
-    center_ijk_on_face.coord.k
-  );
-  for (i, fv) in fijk_verts.iter().enumerate() {
-    println!(
-      "    fijk_verts[{}]: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-      i, fv.face, fv.coord.i, fv.coord.j, fv.coord.k
-    );
-  }
+  // println!(
+  //   "  Computed fijk_verts (adj_res={}). Center on substrate: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+  //   adj_res,
+  //   center_ijk_on_face.face,
+  //   center_ijk_on_face.coord.i,
+  //   center_ijk_on_face.coord.j,
+  //   center_ijk_on_face.coord.k
+  // );
+  // for (i, fv) in fijk_verts.iter().enumerate() {
+  //   println!(
+  //     "    fijk_verts[{}]: {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+  //     i, fv.face, fv.coord.i, fv.coord.j, fv.coord.k
+  //   );
+  // }
 
   let additional_iteration = if length == NUM_HEX_VERTS as i32 { 1 } else { 0 };
 
@@ -818,30 +818,30 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
 
   for vert_idx_loop in 0..(length + additional_iteration) {
     let topological_v_idx = (start + vert_idx_loop) % (NUM_HEX_VERTS as i32);
-    println!(
-      "  Loop vert_idx_loop={}, topological_v_idx={}",
-      vert_idx_loop, topological_v_idx
-    );
+    // println!(
+    //   "  Loop vert_idx_loop={}, topological_v_idx={}",
+    //   vert_idx_loop, topological_v_idx
+    // );
 
     let fijk_current_vert_substrate = fijk_verts[topological_v_idx as usize];
-    println!(
-      "    fijk_current_vert_substrate (before adj): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
-      fijk_current_vert_substrate.face,
-      fijk_current_vert_substrate.coord.i,
-      fijk_current_vert_substrate.coord.j,
-      fijk_current_vert_substrate.coord.k
-    );
+    // println!(
+    //   "    fijk_current_vert_substrate (before adj): {{face:{}, coord:{{i:{},j:{},k:{}}}}}",
+    //   fijk_current_vert_substrate.face,
+    //   fijk_current_vert_substrate.coord.i,
+    //   fijk_current_vert_substrate.coord.j,
+    //   fijk_current_vert_substrate.coord.k
+    // );
 
     let mut fijk_current_vert_adj = fijk_current_vert_substrate; // Copy for adjustment
     let current_overage_status = _adjust_overage_class_ii(&mut fijk_current_vert_adj, adj_res, false, true);
-    println!(
-      "    fijk_current_vert_adjusted (after adj): {{face:{}, coord:{{i:{},j:{},k:{}}}}}, overage_status: {:?}",
-      fijk_current_vert_adj.face,
-      fijk_current_vert_adj.coord.i,
-      fijk_current_vert_adj.coord.j,
-      fijk_current_vert_adj.coord.k,
-      current_overage_status
-    );
+    // println!(
+    //   "    fijk_current_vert_adjusted (after adj): {{face:{}, coord:{{i:{},j:{},k:{}}}}}, overage_status: {:?}",
+    //   fijk_current_vert_adj.face,
+    //   fijk_current_vert_adj.coord.i,
+    //   fijk_current_vert_adj.coord.j,
+    //   fijk_current_vert_adj.coord.k,
+    //   current_overage_status
+    // );
 
     if h3_index::is_resolution_class_iii(res)
             && vert_idx_loop > 0 // Not the first edge segment
@@ -849,7 +849,7 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
             && last_overage_status_for_distortion_check != Overage::FaceEdge
     // Previous adjusted vertex wasn't on an edge
     {
-      println!("      Condition met for potential HEXAGON distortion vertex.");
+      // println!("      Condition met for potential HEXAGON distortion vertex.");
       let last_topological_v_idx = (start + vert_idx_loop - 1) % (NUM_HEX_VERTS as i32);
 
       let mut v2d_prev_topo_on_center_face = Vec2d::default();
@@ -857,20 +857,20 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
         &fijk_verts[last_topological_v_idx as usize].coord,
         &mut v2d_prev_topo_on_center_face,
       );
-      println!(
-        "        v2d_prev_topo_on_center_face (from fijk_verts[{}].coord): {{x:{:.4}, y:{:.4}}}",
-        last_topological_v_idx, v2d_prev_topo_on_center_face.x, v2d_prev_topo_on_center_face.y
-      );
+      // println!(
+      //   "        v2d_prev_topo_on_center_face (from fijk_verts[{}].coord): {{x:{:.4}, y:{:.4}}}",
+      //   last_topological_v_idx, v2d_prev_topo_on_center_face.x, v2d_prev_topo_on_center_face.y
+      // );
 
       let mut v2d_curr_topo_on_center_face = Vec2d::default();
       _ijk_to_hex2d(
         &fijk_verts[topological_v_idx as usize].coord,
         &mut v2d_curr_topo_on_center_face,
       );
-      println!(
-        "        v2d_curr_topo_on_center_face (from fijk_verts[{}].coord): {{x:{:.4}, y:{:.4}}}",
-        topological_v_idx, v2d_curr_topo_on_center_face.x, v2d_curr_topo_on_center_face.y
-      );
+      // println!(
+      //   "        v2d_curr_topo_on_center_face (from fijk_verts[{}].coord): {{x:{:.4}, y:{:.4}}}",
+      //   topological_v_idx, v2d_curr_topo_on_center_face.x, v2d_curr_topo_on_center_face.y
+      // );
 
       let max_dim_substrate = MAX_DIM_BY_CII_RES[adj_res as usize] * 3;
       let v0_icosa_edge = Vec2d {
@@ -891,13 +891,13 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
       } else {
         last_fijk_adj_for_distortion.face
       };
-      println!(
-        "        Center face: {}, Crossed_to_face: {}",
-        center_ijk_on_face.face, crossed_to_face
-      );
+      // println!(
+      //   "        Center face: {}, Crossed_to_face: {}",
+      //   center_ijk_on_face.face, crossed_to_face
+      // );
 
       let edge_dir_idx = ADJACENT_FACE_DIR[center_ijk_on_face.face as usize][crossed_to_face as usize];
-      println!("        Edge direction index from ADJACENT_FACE_DIR: {}", edge_dir_idx);
+      // println!("        Edge direction index from ADJACENT_FACE_DIR: {}", edge_dir_idx);
 
       let icosa_edge_vA: &Vec2d;
       let icosa_edge_vB: &Vec2d;
@@ -907,23 +907,23 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
         ij_quad if ij_quad == IJ_QUADRANT as i32 => {
           icosa_edge_vA = &v0_icosa_edge;
           icosa_edge_vB = &v1_icosa_edge;
-          println!("        Crossing IJ quadrant edge (v0-v1)");
+          // println!("        Crossing IJ quadrant edge (v0-v1)");
         }
         jk_quad if jk_quad == JK_QUADRANT as i32 => {
           icosa_edge_vA = &v1_icosa_edge;
           icosa_edge_vB = &v2_icosa_edge;
-          println!("        Crossing JK quadrant edge (v1-v2)");
+          // println!("        Crossing JK quadrant edge (v1-v2)");
         }
         ki_quad if ki_quad == KI_QUADRANT as i32 => {
           // Explicit KI
           icosa_edge_vA = &v2_icosa_edge;
           icosa_edge_vB = &v0_icosa_edge;
-          println!("        Crossing KI quadrant edge (v2-v0)");
+          // println!("        Crossing KI quadrant edge (v2-v0)");
         }
         _ => {
           // This case should ideally not be hit if faces are truly adjacent and differ
-          println!("        ERROR: Invalid edge_dir_idx {} for HEXAGON distortion from ADJACENT_FACE_DIR for faces {} and {}. Skipping distortion vertex.", 
-                             edge_dir_idx, center_ijk_on_face.face, crossed_to_face);
+          // println!("        ERROR: Invalid edge_dir_idx {} for HEXAGON distortion from ADJACENT_FACE_DIR for faces {} and {}. Skipping distortion vertex.", 
+          //                    edge_dir_idx, center_ijk_on_face.face, crossed_to_face);
           proceed_with_intersection = false;
           // Assign dummy values to satisfy compiler, but they won't be used
           icosa_edge_vA = &v0_icosa_edge; // Assuming v0_icosa_edge refers to one of the defined edges
@@ -941,19 +941,19 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
           icosa_edge_vB,
           &mut intersection_hex2d,
         );
-        println!(
-          "        Intersection point (hex2d on center_ijk_on_face.face plane): {{x:{:.4}, y:{:.4}}}",
-          intersection_hex2d.x, intersection_hex2d.y
-        );
+        // println!(
+        //   "        Intersection point (hex2d on center_ijk_on_face.face plane): {{x:{:.4}, y:{:.4}}}",
+        //   intersection_hex2d.x, intersection_hex2d.y
+        // );
 
         if !_v2d_almost_equals(&v2d_prev_topo_on_center_face, &intersection_hex2d)
           && !_v2d_almost_equals(&v2d_curr_topo_on_center_face, &intersection_hex2d)
         {
           if g.num_verts < MAX_CELL_BNDRY_VERTS {
-            println!(
-              "        Adding HEXAGON distortion vertex. Current g.num_verts = {}",
-              g.num_verts
-            );
+            // println!(
+            //   "        Adding HEXAGON distortion vertex. Current g.num_verts = {}",
+            //   g.num_verts
+            // );
             _hex2d_to_geo(
               &intersection_hex2d,
               center_ijk_on_face.face,
@@ -963,22 +963,22 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
             );
             g.num_verts += 1;
           } else {
-            println!("        MAX_CELL_BNDRY_VERTS limit reached for HEXAGON distortion vertex!");
+            // println!("        MAX_CELL_BNDRY_VERTS limit reached for HEXAGON distortion vertex!");
           }
         } else {
-          println!("        HEXAGON Distortion intersection point is same as a topological vertex, not adding.");
+          // println!("        HEXAGON Distortion intersection point is same as a topological vertex, not adding.");
         }
       } // else, if !proceed_with_intersection, we skip this block.
     } else {
-      println!("      Condition NOT met for HEXAGON distortion vertex (or faces same, or last was on edge).");
+      // println!("      Condition NOT met for HEXAGON distortion vertex (or faces same, or last was on edge).");
     }
 
     if vert_idx_loop < length {
       if g.num_verts < MAX_CELL_BNDRY_VERTS {
-        println!(
-          "    Adding topological vertex {} to boundary. Current g.num_verts = {}",
-          topological_v_idx, g.num_verts
-        );
+        // println!(
+        //   "    Adding topological vertex {} to boundary. Current g.num_verts = {}",
+        //   topological_v_idx, g.num_verts
+        // );
         let mut vec_for_geo = Vec2d::default();
         _ijk_to_hex2d(&fijk_current_vert_adj.coord, &mut vec_for_geo);
         _hex2d_to_geo(
@@ -990,16 +990,16 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
         );
         g.num_verts += 1;
       } else {
-        println!("    MAX_CELL_BNDRY_VERTS limit reached for main HEXAGON topological vertex!");
+        // println!("    MAX_CELL_BNDRY_VERTS limit reached for main HEXAGON topological vertex!");
       }
     }
     last_fijk_adj_for_distortion = fijk_current_vert_adj;
     last_overage_status_for_distortion_check = current_overage_status;
   }
-  println!(
-    "--- _face_ijk_to_cell_boundary --- END Final g.num_verts: {}",
-    g.num_verts
-  );
+  // println!(
+  //   "--- _face_ijk_to_cell_boundary --- END Final g.num_verts: {}",
+  //   g.num_verts
+  // );
 }
 
 pub(crate) fn _face_ijk_to_verts(
@@ -1107,7 +1107,7 @@ mod tests {
 
   #[test]
   fn test_hex2d_to_geo_roundtrip() {
-    println!("--- test_hex2d_to_geo_roundtrip --- START");
+    // println!("--- test_hex2d_to_geo_roundtrip --- START");
     for f_orig_idx in 0..(NUM_ICOSA_FACES as usize) {
       for &res_orig_val in &[0, 1, 5] {
         let res_orig = res_orig_val as i32;
@@ -1142,7 +1142,7 @@ mod tests {
         );
       }
     }
-    println!("--- test_hex2d_to_geo_roundtrip --- END");
+    // println!("--- test_hex2d_to_geo_roundtrip --- END");
   }
 
   #[test]

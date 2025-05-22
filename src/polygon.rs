@@ -510,8 +510,8 @@ mod tests {
     };
     let mut bbox_ccw = BBox::default();
     bbox_from_geoloop(&geoloop_ccw, &mut bbox_ccw);
-    println!("geoloop {:?}", geoloop_ccw);
-    println!("bbox {:?}", bbox_ccw);
+    // println!("geoloop {:?}", geoloop_ccw);
+    // println!("bbox {:?}", bbox_ccw);
     assert!(
       !is_clockwise_geoloop(&geoloop_ccw, &bbox_ccw),
       "CCW loop should not be clockwise"

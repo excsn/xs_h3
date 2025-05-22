@@ -70,7 +70,7 @@ pub use measures::{
   exact_edge_length_m,
   exact_edge_length_rads,
 };
-pub use regions::{cells_to_multi_polygon, max_polygon_to_cells_size, polygon_to_cells};
+pub use regions::{cells_to_multi_polygon, max_polygon_to_cells_size, polygon_to_cells, MultiPolygonRust, PolygonRust};
 pub use traversal::{
   are_neighbor_cells, grid_disk, grid_disk_distances, grid_distance, grid_path_cells, grid_path_cells_size,
   grid_ring_unsafe, max_grid_disk_size,

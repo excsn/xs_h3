@@ -19,33 +19,33 @@ use crate::types::{H3Error, H3Index};
 /// `Ok(distance)` on success, or an `H3Error` if the distance cannot be computed.
 pub fn grid_distance(origin: H3Index, destination: H3Index) -> Result<i64, H3Error> {
     // Initial debug print for the function call
-    eprintln!(
-        "DEBUG: grid_distance called with origin=0x{:x}, destination=0x{:x}",
-        origin.0, destination.0
-    );
+    // eprintln!(
+    //     "DEBUG: grid_distance called with origin=0x{:x}, destination=0x{:x}",
+    //     origin.0, destination.0
+    // );
 
     // Initial checks from C version of gridDistance (before _h3Distance)
     if get_mode(origin) != crate::constants::H3_CELL_MODE
         || get_mode(destination) != crate::constants::H3_CELL_MODE
     {
-        eprintln!("  DEBUG: grid_distance -> returning CellInvalid (mode check)");
+        // eprintln!("  DEBUG: grid_distance -> returning CellInvalid (mode check)");
         return Err(H3Error::CellInvalid);
     }
 
     if get_resolution(origin) != get_resolution(destination) {
-        eprintln!("  DEBUG: grid_distance -> returning ResMismatch");
+        // eprintln!("  DEBUG: grid_distance -> returning ResMismatch");
         return Err(H3Error::ResMismatch);
     }
 
     // The C public API H3_EXPORT(gridDistance) also calls isValidCell.
     if !is_valid_cell(origin) || !is_valid_cell(destination) {
-        eprintln!("  DEBUG: grid_distance -> returning CellInvalid (isValidCell check)");
+        // eprintln!("  DEBUG: grid_distance -> returning CellInvalid (isValidCell check)");
         return Err(H3Error::CellInvalid);
     }
     
     // If origin and destination are the same, distance is 0.
     if origin == destination {
-        eprintln!("  DEBUG: grid_distance -> origin == destination, returning Ok(0)");
+        // eprintln!("  DEBUG: grid_distance -> origin == destination, returning Ok(0)");
         return Ok(0);
     }
 
@@ -54,19 +54,19 @@ pub fn grid_distance(origin: H3Index, destination: H3Index) -> Result<i64, H3Err
     let origin_ijk_in_own_frame = crate::types::CoordIJK { i: 0, j: 0, k: 0 };
 
     let mut destination_ijk_in_origin_frame = crate::types::CoordIJK::default();
-    // `cell_to_local_ijk` will have its own eprintln! for inputs and outputs
+    // `cell_to_local_ijk` will have its own // eprintln! for inputs and outputs
     match cell_to_local_ijk(origin, destination, &mut destination_ijk_in_origin_frame) {
         Ok(()) => {
-            eprintln!(
-                "  DEBUG: grid_distance: cell_to_local_ijk for destination (0x{:x} relative to 0x{:x}) yielded: {:?}",
-                destination.0, origin.0, destination_ijk_in_origin_frame
-            );
+            // eprintln!(
+            //     "  DEBUG: grid_distance: cell_to_local_ijk for destination (0x{:x} relative to 0x{:x}) yielded: {:?}",
+            //     destination.0, origin.0, destination_ijk_in_origin_frame
+            // );
         }
         Err(e) => {
-            eprintln!(
-                "  DEBUG: grid_distance: cell_to_local_ijk for destination (0x{:x} relative to 0x{:x}) errored: {:?}",
-                destination.0, origin.0, e
-            );
+            // eprintln!(
+            //     "  DEBUG: grid_distance: cell_to_local_ijk for destination (0x{:x} relative to 0x{:x}) errored: {:?}",
+            //     destination.0, origin.0, e
+            // );
             return Err(e); // Propagate error from cell_to_local_ijk
         }
     }
@@ -74,14 +74,14 @@ pub fn grid_distance(origin: H3Index, destination: H3Index) -> Result<i64, H3Err
     // The distance is the IJK grid distance between {0,0,0} and the destination's local IJK.
     let dist_val = ijk_distance(&origin_ijk_in_own_frame, &destination_ijk_in_origin_frame) as i64;
     
-    eprintln!(
-        "  DEBUG: grid_distance: ijk_distance({:?}, {:?}) calculated distance = {}",
-        origin_ijk_in_own_frame, destination_ijk_in_origin_frame, dist_val
-    );
-    eprintln!(
-        "DEBUG: grid_distance for origin=0x{:x}, destination=0x{:x} FINISHED, returning Ok({})",
-        origin.0, destination.0, dist_val
-    );
+    // eprintln!(
+    //     "  DEBUG: grid_distance: ijk_distance({:?}, {:?}) calculated distance = {}",
+    //     origin_ijk_in_own_frame, destination_ijk_in_origin_frame, dist_val
+    // );
+    // eprintln!(
+    //     "DEBUG: grid_distance for origin=0x{:x}, destination=0x{:x} FINISHED, returning Ok({})",
+    //     origin.0, destination.0, dist_val
+    // );
     Ok(dist_val)
 }
 

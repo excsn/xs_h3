@@ -1,11 +1,16 @@
 //! Core H3 data structures.
 
 use crate::constants::MAX_CELL_BNDRY_VERTS;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// Represents an H3 cell index or a directed H3 edge index.
 /// This is a 64-bit unsigned integer.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct H3Index(pub u64);
 
 /// Invalid H3 index, often used to signify an error or missing data.
@@ -13,6 +18,7 @@ pub const H3_NULL: H3Index = H3Index(0);
 
 /// Latitude/longitude coordinates in radians.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LatLng {
   /// Latitude in radians.
   pub lat: f64,
@@ -25,6 +31,7 @@ pub struct LatLng {
 /// Contains the number of vertices and an array of `LatLng` coordinates
 /// forming the cell boundary in counter-clockwise order.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CellBoundary {
   /// Number of vertices in the boundary.
   pub num_verts: usize,
@@ -45,6 +52,7 @@ impl Default for CellBoundary {
 /// Represents a single closed loop of geographic coordinates.
 /// The last vertex is not implicitly connected to the first.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GeoLoop {
   /// Number of vertices in the loop.
   pub num_verts: usize,
@@ -54,6 +62,7 @@ pub struct GeoLoop {
 
 /// Represents a polygon with an outer loop and zero or more inner hole loops.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GeoPolygon {
   /// The outer loop of the polygon.
   pub geoloop: GeoLoop,
@@ -68,6 +77,7 @@ pub struct GeoPolygon {
 /// Represents an H3 error code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
+#[cfg_attr(feature = "serde", derive(Serialize_repr, Deserialize_repr))]
 #[allow(clippy::enum_variant_names)] // To match C naming
 pub enum H3Error {
   /// Success (no error).
@@ -106,6 +116,7 @@ pub enum H3Error {
 
 /// IJ hexagon coordinates. Each axis is spaced 120 degrees apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CoordIJ {
   /// I component.
   pub i: i32,
@@ -116,6 +127,7 @@ pub struct CoordIJ {
 /// IJK hexagon coordinates. Each axis is spaced 120 degrees apart.
 /// The K component is derived from `i` and `j` (`k = -i - j`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CoordIJK {
   /// I component.
   pub i: i32,
@@ -127,6 +139,7 @@ pub struct CoordIJK {
 
 /// Face number and IJK coordinates on that face-centered coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FaceIJK {
   /// Icosahedron face number (0-19).
   pub face: i32,
@@ -136,6 +149,7 @@ pub struct FaceIJK {
 
 /// 2D floating-point vector.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Vec2d {
   /// X component.
   pub x: f64,
@@ -145,6 +159,7 @@ pub struct Vec2d {
 
 /// 3D floating-point vector.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Vec3d {
   /// X component.
   pub x: f64,
@@ -157,6 +172,7 @@ pub struct Vec3d {
 /// H3 digit representing IJK+ axes direction (0-6), or invalid (7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 #[repr(u8)]
+#[cfg_attr(feature = "serde", derive(Serialize_repr, Deserialize_repr))]
 pub enum Direction {
   /// H3 digit in center.
   Center = 0,
@@ -204,6 +220,7 @@ impl TryFrom<u8> for Direction {
 
 /// Geographic bounding box with coordinates defined in radians.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BBox {
   /// North latitude in radians.
   pub north: f64,
@@ -218,6 +235,7 @@ pub struct BBox {
 /// Values representing polyfill containment modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)] // To match C flags if needed, though Rust usually uses u8 or usize for enums like this
+#[cfg_attr(feature = "serde", derive(Serialize_repr, Deserialize_repr))]
 pub enum ContainmentMode {
   /// Cell center is contained in the shape.
   Center = 0,

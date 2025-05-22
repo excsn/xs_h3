@@ -12,4 +12,4 @@ pub use polyfill::{
                     // maxPolygonToCellsSize, polygonToCells,
                     // maxPolygonToCellsSizeExperimental, polygonToCellsExperimental
 };
-pub use to_polygon::cells_to_multi_polygon;
+pub use to_polygon::{cells_to_multi_polygon, MultiPolygonRust, PolygonRust};

@@ -332,7 +332,7 @@ pub(crate) fn _hex2d_to_coord_ijk(v: &Vec2d, h: &mut CoordIJK) {
       // odd j
       let axisi = (h.j + 1) / 2;
       let diff = h.i - axisi;
-      h.i -= (2 * diff + 1); // Equivalent to h.i = h.i - (2 * diff + 1)
+      h.i -= 2 * diff + 1; // Equivalent to h.i = h.i - (2 * diff + 1)
     }
   }
   if v.y < 0.0 {
@@ -361,10 +361,10 @@ pub(crate) fn _ijk_to_hex2d(h: &CoordIJK, v: &mut Vec2d) {
   let j = h.j - h.k;
   v.x = i as f64 - 0.5 * j as f64;
   v.y = j as f64 * M_SQRT3_2;
-  println!(
-    "--- _ijk_to_hex2d --- Input IJK: {{i:{},j:{},k:{}}} -> Axial (i-k, j-k): ({},{}) -> v2d: {{x:{:.4}, y:{:.4}}}",
-    h.i, h.j, h.k, i, j, v.x, v.y
-  );
+  // println!(
+  //   "--- _ijk_to_hex2d --- Input IJK: {{i:{},j:{},k:{}}} -> Axial (i-k, j-k): ({},{}) -> v2d: {{x:{:.4}, y:{:.4}}}",
+  //   h.i, h.j, h.k, i, j, v.x, v.y
+  // );
 }
 
 // Helper for lround, C's lround might not be available or behave identically
