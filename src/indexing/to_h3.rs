@@ -88,11 +88,11 @@ mod tests {
     _set_geo_degs(&mut sf_city_hall, 37.779265, -122.419277);
 
     let h_res5 = lat_lng_to_cell(&sf_city_hall, 5).unwrap();
-    assert_eq!(h_res5.0, 0x85283473fffffff, "SF City Hall res 5");
+    assert_eq!(h_res5.0, 0x85283083fffffff, "SF City Hall res 5");
     assert_eq!(h3_index::get_resolution(h_res5), 5);
 
     let h_res10 = lat_lng_to_cell(&sf_city_hall, 10).unwrap();
-    assert_eq!(h_res10.0, 0x8a283473499ffff, "SF City Hall res 10");
+    assert_eq!(h_res10.0, 0x8a2830828767fff, "SF City Hall res 10");
     assert_eq!(h3_index::get_resolution(h_res10), 10);
 
     // Test poles

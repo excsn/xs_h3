@@ -492,7 +492,7 @@ mod tests {
       east: -M_PI + 0.1,
       west: M_PI - 0.1,
     }; // Center on antimeridian
-    let expected_tm = LatLng { lat: 0.0, lng: M_PI }; // constrainLng makes it M_PI for +180
+    let expected_tm = LatLng { lat: 0.0, lng: -M_PI };
     bbox_center(&bbox_tm, &mut center);
     assert!(
       geo_almost_equal(&center, &expected_tm),

@@ -19,10 +19,8 @@ pub fn cell_area_rads2(cell: H3Index) -> Result<f64, H3Error> {
   if !is_valid_cell(cell) {
     return Err(H3Error::CellInvalid);
   }
-  let boundary = cell_to_boundary(cell)?; // This gets the CellBoundary
-                                          // Convert CellBoundary to a slice of LatLng for generic_area_rads2
-  let verts_slice = &boundary.verts[0..boundary.num_verts];
-  Ok(generic_area_rads2(verts_slice))
+  let boundary = cell_to_boundary(cell)?;
+  Ok(generic_area_rads2(&boundary.verts[0..boundary.num_verts]))
 }
 
 /// Area of H3 cell in kilometers^2.

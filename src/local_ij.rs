@@ -1,12 +1,13 @@
 use crate::base_cells::{
   _base_cell_is_cw_offset, _face_ijk_to_base_cell, _face_ijk_to_base_cell_ccwrot60, _get_base_cell_direction,
-  _get_base_cell_neighbor, _is_base_cell_pentagon, INVALID_BASE_CELL,
+  _get_base_cell_neighbor, _is_base_cell_pentagon, _is_base_cell_polar_pentagon, BASE_CELL_NEIGHBOR_60CCW_ROTS,
+  INVALID_BASE_CELL,
 };
-use crate::constants::{H3_CELL_MODE, MAX_H3_RES, NUM_BASE_CELLS};
+use crate::constants::{H3_CELL_MODE, H3_INIT, MAX_H3_RES, NUM_BASE_CELLS};
 use crate::coords::face_ijk::{ADJACENT_FACE_DIR, FACE_NEIGHBORS, INVALID_FACE}; // This table is crucial
 use crate::coords::ijk::{
   _down_ap7, _down_ap7r, _ijk_add, _ijk_normalize, _ijk_normalize_could_overflow, _ijk_rotate60_ccw, _ijk_rotate60_cw,
-  _ijk_scale, _ijk_sub, _unit_ijk_to_digit, _up_ap7, _up_ap7r, ij_to_ijk, ijk_to_ij, UNIT_VECS,
+  _ijk_scale, _ijk_sub, _rotate60_ccw, _unit_ijk_to_digit, _up_ap7, _up_ap7r, ij_to_ijk, ijk_to_ij, UNIT_VECS,
 };
 use crate::h3_index::inspection::is_valid_cell;
 use crate::h3_index::{
@@ -30,6 +31,17 @@ static PENTAGON_ROTATIONS: [[i32; 7]; 7] = [
     [0, -1, 0, 5, 0, 0, 0],        // 4 I_AXES
     [0, -1, 5, 5, 0, 0, 0],        // 5 IK_AXES
     [0, -1, 0, 0, 0, 0, 0],        // 6 IJ_AXES
+];
+
+#[rustfmt::skip]
+static PENTAGON_ROTATIONS_REVERSE: [[i32; 7]; 7] = [
+    [0, 0, 0, 0, 0, 0, 0],        // 0 CENTER
+    [-1, -1, -1, -1, -1, -1, -1],  // 1 K_AXES
+    [0, 1, 0, 0, 0, 0, 0],        // 2 J_AXES
+    [0, 1, 0, 0, 0, 1, 0],        // 3 JK_AXES
+    [0, 5, 0, 0, 0, 0, 0],        // 4 I_AXES
+    [0, 5, 0, 5, 0, 0, 0],        // 5 IK_AXES
+    [0, 0, 0, 0, 0, 0, 0],        // 6 IJ_AXES - C is all 0s.
 ];
 
 // For reversing rotations when the index is on a pentagon and origin is not.
@@ -81,176 +93,167 @@ static FAILED_DIRECTIONS: [[bool; 7]; 7] = [
 /// # Returns
 /// `Ok(())` on success, or an `H3Error` on failure.
 // This is the Rust port of C's `_h3ToLocalIJK`
-pub(crate) fn cell_to_local_ijk(origin: H3Index, index: H3Index, out_ijk: &mut CoordIJK) -> Result<(), H3Error> {
+pub fn cell_to_local_ijk(origin: H3Index, index: H3Index, out_ijk: &mut CoordIJK) -> Result<(), H3Error> {
+  eprintln!(
+    "  DEBUG: cell_to_local_ijk called with origin=0x{:x}, index=0x{:x}",
+    origin.0, index.0
+  );
+
   let res = get_resolution(origin);
 
-  // Check for invalid or mismatched resolution inputs
+  // Basic validation (already in grid_distance, but good for standalone use)
   if res != get_resolution(index) {
+    eprintln!("    DEBUG: cell_to_local_ijk -> ResMismatch");
     return Err(H3Error::ResMismatch);
   }
-  // isValidCell would catch this, but direct check is faster
-  if get_mode(origin) != H3_CELL_MODE || get_mode(index) != H3_CELL_MODE {
-    return Err(H3Error::CellInvalid);
-  }
-  // More thorough validation, though could be skipped if inputs are trusted
   if !is_valid_cell(origin) || !is_valid_cell(index) {
+    eprintln!("    DEBUG: cell_to_local_ijk -> CellInvalid (input validation)");
     return Err(H3Error::CellInvalid);
   }
 
   let origin_base_cell = get_base_cell(origin);
   let index_base_cell = get_base_cell(index);
 
-  // If the indexes are on the same base cell, IJK can be calculated directly.
-  if origin_base_cell == index_base_cell {
-    let mut origin_center_fijk = FaceIJK::default();
-    _h3_to_face_ijk(origin, &mut origin_center_fijk)?; // Get origin's Fijk
+  // Get canonical FaceIJK for origin and index
+  let mut fijk_origin_canonical = FaceIJK::default();
+  _h3_to_face_ijk(origin, &mut fijk_origin_canonical)?; // This will have its own eprint
+  eprintln!(
+    "    DEBUG: cell_to_local_ijk: fijk_origin_canonical (for origin 0x{:x}) = {:?}",
+    origin.0, fijk_origin_canonical
+  );
 
-    let mut index_fijk = FaceIJK::default();
-    _h3_to_face_ijk(index, &mut index_fijk)?; // Get index's Fijk
+  let mut fijk_index_canonical = FaceIJK::default();
+  _h3_to_face_ijk(index, &mut fijk_index_canonical)?;
+  eprintln!(
+    "    DEBUG: cell_to_local_ijk: fijk_index_canonical (for index 0x{:x}) = {:?}",
+    index.0, fijk_index_canonical
+  );
 
-    // If they are on the same face, simply subtract coordinates
-    if origin_center_fijk.face == index_fijk.face {
-      _ijk_sub(&index_fijk.coord, &origin_center_fijk.coord, out_ijk);
-    } else {
-      // This case happens when the center of the base cell is on a different
-      // face than the origin or index. This is handled by the main logic
-      // below that translates across faces.
-      // For now, treat as a general cross-face case.
-      // Or, if we get here, it implies an issue with _h3ToFaceIJK not returning canonical.
-      // The C code has a specific helper _faceToFaceIjk for this.
-      // Let's fall through to the general logic for now.
-      // This branch in C calls _faceToFaceIjk then subtracts.
-      // This should be handled by the generic logic below.
-      // If _h3ToFaceIjk correctly returns canonical FaceIJK (on home face),
-      // this branch should not be taken for same base cell.
-      // If it IS taken, it means _h3ToFaceIJK produced different faces for cells
-      // on the same base cell, which is an issue.
-      // For now, let's assume _h3ToFaceIJK is canonical and this branch isn't hit
-      // for same base cell. If tests show otherwise, we'll need `_faceToFaceIjk`.
-      // The C code doesn't have this explicit `if (origin_center_fijk.face == index_fijk.face)`
-      // for the same base cell case. It directly computes a translation if faces differ.
-      // That translation logic is what we need below.
-      // So, if same base cell, they must be on same canonical face from _h3ToFaceIJK.
-      // Any difference in face implies one of them is an overage case handled by general logic.
-      // This means the simple subtraction above should be correct *if* they are on the same face.
-      // The C code's logic:
-      //  _h3ToFaceIjk(origin, &fijkOrigin);
-      //  _h3ToFaceIjk(h3, &fijkH3);
-      //  if (fijkOrigin.face == fijkH3.face) { subtract coords }
-      //  else { _faceToFaceIjk(&fijkH3, fijkOrigin.face, &fijkH3); subtract coords }
-      // This implies _h3ToFaceIjk might return non-home faces if overage occurs.
-      // Our _h3_to_face_ijk *does* handle overage and returns the canonical Fijk.
-      // So if base cells are same, faces from _h3_to_face_ijk MUST be same.
-
-      // Re-evaluate. The `_h3ToLocalIJK` in C gets the FaceIJK for origin and index.
-      // These are canonical.
-      let mut fijk_origin_canonical = FaceIJK::default();
-      _h3_to_face_ijk(origin, &mut fijk_origin_canonical)?;
-      let mut fijk_index_canonical = FaceIJK::default();
-      _h3_to_face_ijk(index, &mut fijk_index_canonical)?;
-
-      if fijk_origin_canonical.face == fijk_index_canonical.face {
-        _ijk_sub(&fijk_index_canonical.coord, &fijk_origin_canonical.coord, out_ijk);
-      } else {
-        // This implies cells on the same base cell are mapping to different canonical faces.
-        // This happens for base cells whose shape spans multiple icosa faces (e.g. near corners).
-        // We need to translate fijk_index_canonical to be on fijk_origin_canonical.face.
-        // This is where _faceToFaceIjk from C is used. We need to port or inline it.
-        // For now, error, as this needs careful handling.
-        // Let's assume for cells on the *same base cell*, their canonical FaceIJKs from
-        // `_h3_to_face_ijk` will be on the *same face*.
-        // This means the simpler subtraction path should be taken.
-        // If tests prove this assumption wrong, we need _faceToFaceIjk here.
-        _ijk_sub(&fijk_index_canonical.coord, &fijk_origin_canonical.coord, out_ijk);
-        // If this subtraction still doesn't work, it means the simple model is insufficient.
-        // The C code *does* have the else branch calling _faceToFaceIjk for same base cell.
-        // This implies that even for the same base cell, their canonical fijk might be reported on different faces
-        // if they are near an icosahedron edge that divides the base cell.
-        //
-        // Let's port a simplified _faceToFaceIjk logic here for now.
-        // The goal is to transform fijk_index_canonical to be on fijk_origin_canonical.face
-        if _face_to_face_ijk_inplace(&mut fijk_index_canonical, res, fijk_origin_canonical.face).is_err() {
-          return Err(H3Error::Failed); // Could not translate
-        }
-        _ijk_sub(&fijk_index_canonical.coord, &fijk_origin_canonical.coord, out_ijk);
-      }
-    }
+  // If they ended up on the same canonical face, simple subtraction.
+  if fijk_origin_canonical.face == fijk_index_canonical.face {
+    _ijk_sub(&fijk_index_canonical.coord, &fijk_origin_canonical.coord, out_ijk);
+    eprintln!(
+      "    DEBUG: cell_to_local_ijk: Same canonical face ({}), subtracted coords to get out_ijk = {:?}",
+      fijk_origin_canonical.face, out_ijk
+    );
   } else {
-    // Different base cells
-    let mut fijk_origin_canonical = FaceIJK::default();
-    _h3_to_face_ijk(origin, &mut fijk_origin_canonical)?;
+    // Different canonical faces. Translate index's Fijk to be on origin's canonical face.
+    // This uses a simplified version of C's _faceToFaceIjk.
+    // We need a mutable copy of fijk_index_canonical to pass to _face_to_face_ijk_inplace
+    let mut fijk_index_on_origin_face = fijk_index_canonical;
+    eprintln!("    DEBUG: cell_to_local_ijk: Different canonical faces. Origin face: {}, Index face: {}. Translating index to origin's face.", fijk_origin_canonical.face, fijk_index_canonical.face);
 
-    let mut fijk_index_canonical = FaceIJK::default();
-    _h3_to_face_ijk(index, &mut fijk_index_canonical)?;
-
-    // Transform index's Fijk to be on the origin's canonical face
-    if _face_to_face_ijk_inplace(&mut fijk_index_canonical, res, fijk_origin_canonical.face).is_err() {
+    if _face_to_face_ijk_inplace(&mut fijk_index_on_origin_face, res, fijk_origin_canonical.face).is_err() {
+      eprintln!("    DEBUG: cell_to_local_ijk -> Failed (_face_to_face_ijk_inplace failed)");
       return Err(H3Error::Failed); // Could not translate
     }
-    _ijk_sub(&fijk_index_canonical.coord, &fijk_origin_canonical.coord, out_ijk);
+    eprintln!(
+      "    DEBUG: cell_to_local_ijk: fijk_index_on_origin_face (after translate) = {:?}",
+      fijk_index_on_origin_face
+    );
+    _ijk_sub(&fijk_index_on_origin_face.coord, &fijk_origin_canonical.coord, out_ijk);
+    eprintln!(
+      "    DEBUG: cell_to_local_ijk: Subtracted coords (after translate) to get out_ijk = {:?}",
+      out_ijk
+    );
   }
 
-  // Handle pentagon distortion
-  let origin_is_pent = is_pentagon(origin); // From h3_index::inspection
-  let index_is_pent = is_pentagon(index);
+  // Pentagon distortion adjustments
+  let origin_is_pent = is_pentagon(origin);
+  let index_is_pent = is_pentagon(index); // Note: This is on the global H3Index `index`
 
   if origin_is_pent || index_is_pent {
-    let origin_center_digit = _h3_leading_non_zero_digit(origin);
-    let index_center_digit = _h3_leading_non_zero_digit(index);
+    eprintln!(
+      "    DEBUG: cell_to_local_ijk: Pentagon distortion logic entered. OriginPent={}, IndexPent={}",
+      origin_is_pent, index_is_pent
+    );
+    let origin_center_digit_for_rotation_logic = _h3_leading_non_zero_digit(origin);
+
+    // If index is also on the same base cell as origin, its leading digit is used.
+    // If index is on a different base cell, the direction *to* that base cell is used.
+    let index_related_digit_for_rotation_logic: Direction;
+
+    if origin_base_cell == index_base_cell {
+      index_related_digit_for_rotation_logic = _h3_leading_non_zero_digit(index);
+    } else {
+      // Direction from origin's base cell to index's base cell
+      index_related_digit_for_rotation_logic = _get_base_cell_direction(origin_base_cell, index_base_cell);
+      if index_related_digit_for_rotation_logic == Direction::InvalidDigit && origin_base_cell != index_base_cell {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic: Base cells not neighbors and not same.");
+        return Err(H3Error::Failed);
+      }
+    }
+    eprintln!(
+      "    DEBUG: cell_to_local_ijk: Pentagon logic: origin_digit_for_rot={:?}, index_related_digit_for_rot={:?}",
+      origin_center_digit_for_rotation_logic, index_related_digit_for_rotation_logic
+    );
 
     if origin_is_pent && index_is_pent {
-      // Both are pentagons
-      // This implies they are the same cell, as pentagons don't neighbor.
-      // Should have been caught by origin == index earlier if grid_distance called this.
-      // Or if they are a pentagon and one of its direct children that is also a pentagon (res 0 to res 1 center).
-      // If same base cell, they must be the same pentagon or parent/child.
-      if origin_base_cell == index_base_cell {
-        // Already handled by simple subtraction.
-        // If different resolutions, ResMismatch handled.
-        // If different cells at same res on same pent base cell, it's an error.
-        // This should be fine.
-      } else {
-        // This should not happen: pentagons do not neighbor.
-        return Err(H3Error::NotNeighbors); // Or Failed
+      if origin_base_cell != index_base_cell {
+        // Should not happen, pentagons don't neighbor
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic: Two different pentagons, should not be neighbors.");
+        return Err(H3Error::NotNeighbors);
       }
-    } else if origin_is_pent {
-      // Origin is pentagon, index is hexagon
-      let dir_to_index_bc = _get_base_cell_direction(origin_base_cell, index_base_cell);
-      if dir_to_index_bc == Direction::InvalidDigit && origin_base_cell != index_base_cell {
-        return Err(H3Error::Failed); // Not actually neighbors, or too far
-      }
-      // If same base cell, dir_to_index_bc is Center. Index is a child of origin.
-      // Leading digit of index is relevant.
-      let index_digit_for_pent_rotation = if origin_base_cell == index_base_cell {
-        index_center_digit
-      } else {
-        dir_to_index_bc
-      };
-
-      if FAILED_DIRECTIONS[origin_center_digit as usize][index_digit_for_pent_rotation as usize] {
-        return Err(H3Error::Pentagon); // Or Failed
-      }
-      let num_rotations = PENTAGON_ROTATIONS[origin_center_digit as usize][index_digit_for_pent_rotation as usize];
-      if num_rotations == -1 {
+      // Both on same pentagon base cell. Rotations based on their leading digits.
+      if FAILED_DIRECTIONS[origin_center_digit_for_rotation_logic as usize]
+        [index_related_digit_for_rotation_logic as usize]
+      {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (both pent): FAILED_DIRECTIONS");
         return Err(H3Error::Pentagon);
-      } // Invalid K-axis related
+      }
+      let num_rotations = PENTAGON_ROTATIONS[origin_center_digit_for_rotation_logic as usize]
+        [index_related_digit_for_rotation_logic as usize];
+      if num_rotations == -1 {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (both pent): num_rotations -1");
+        return Err(H3Error::Pentagon);
+      }
       for _ in 0..num_rotations {
         _ijk_rotate60_cw(out_ijk);
       }
+      eprintln!(
+        "    DEBUG: cell_to_local_ijk: Pentagon logic (both pent): Applied {} CW rotations. out_ijk = {:?}",
+        num_rotations, out_ijk
+      );
+    } else if origin_is_pent {
+      // Origin is pentagon, index is hexagon
+      if FAILED_DIRECTIONS[origin_center_digit_for_rotation_logic as usize]
+        [index_related_digit_for_rotation_logic as usize]
+      {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (origin pent): FAILED_DIRECTIONS");
+        return Err(H3Error::Pentagon);
+      }
+      let num_rotations = PENTAGON_ROTATIONS[origin_center_digit_for_rotation_logic as usize]
+        [index_related_digit_for_rotation_logic as usize];
+      if num_rotations == -1 {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (origin pent): num_rotations -1");
+        return Err(H3Error::Pentagon);
+      }
+      for _ in 0..num_rotations {
+        _ijk_rotate60_cw(out_ijk);
+      }
+      eprintln!(
+        "    DEBUG: cell_to_local_ijk: Pentagon logic (origin pent): Applied {} CW rotations. out_ijk = {:?}",
+        num_rotations, out_ijk
+      );
     } else {
       // Index is pentagon, origin is hexagon
-      let dir_to_origin_bc = _get_base_cell_direction(index_base_cell, origin_base_cell);
-      if dir_to_origin_bc == Direction::InvalidDigit && origin_base_cell != index_base_cell {
+      // Direction here is from pentagon (index) to hexagon (origin)
+      let dir_from_pent_to_origin_bc = _get_base_cell_direction(index_base_cell, origin_base_cell);
+      if dir_from_pent_to_origin_bc == Direction::InvalidDigit && origin_base_cell != index_base_cell {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (index pent): Base cells not neighbors (for dir_from_pent_to_origin_bc).");
         return Err(H3Error::Failed);
       }
-      let origin_digit_for_pent_rotation = if origin_base_cell == index_base_cell {
-        origin_center_digit
+      let origin_related_digit_for_pent_rotation = if origin_base_cell == index_base_cell {
+        origin_center_digit_for_rotation_logic // use origin's leading digit
       } else {
-        dir_to_origin_bc // This is direction from Pent (index) to Hex (origin)
+        dir_from_pent_to_origin_bc
       };
 
-      if FAILED_DIRECTIONS[index_center_digit as usize][origin_digit_for_pent_rotation as usize] {
-        return Err(H3Error::Pentagon); // Or Failed
+      let index_leading_digit = _h3_leading_non_zero_digit(index); // Leading digit of the pentagonal index itself
+
+      if FAILED_DIRECTIONS[index_leading_digit as usize][origin_related_digit_for_pent_rotation as usize] {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (index pent): FAILED_DIRECTIONS");
+        return Err(H3Error::Pentagon);
       }
 
       let rotations_table_ref = if crate::base_cells::_is_base_cell_polar_pentagon(index_base_cell) {
@@ -258,16 +261,26 @@ pub(crate) fn cell_to_local_ijk(origin: H3Index, index: H3Index, out_ijk: &mut C
       } else {
         &PENTAGON_ROTATIONS_REVERSE_NONPOLAR
       };
-      let num_rotations = rotations_table_ref[origin_digit_for_pent_rotation as usize][index_center_digit as usize];
+      let num_rotations =
+        rotations_table_ref[origin_related_digit_for_pent_rotation as usize][index_leading_digit as usize];
       if num_rotations == -1 {
+        eprintln!("    DEBUG: cell_to_local_ijk -> Pentagon logic (index pent): num_rotations -1");
         return Err(H3Error::Pentagon);
       }
       for _ in 0..num_rotations {
         _ijk_rotate60_ccw(out_ijk);
       }
+      eprintln!(
+        "    DEBUG: cell_to_local_ijk: Pentagon logic (index pent): Applied {} CCW rotations. out_ijk = {:?}",
+        num_rotations, out_ijk
+      );
     }
   }
 
+  eprintln!(
+    "  DEBUG: cell_to_local_ijk for origin=0x{:x}, index=0x{:x} FINISHED, output out_ijk = {:?}",
+    origin.0, index.0, out_ijk
+  );
   Ok(())
 }
 
@@ -354,104 +367,158 @@ fn _face_to_face_ijk_inplace(fijk_target: &mut FaceIJK, res: i32, target_face: i
 /// # Returns
 /// `Ok(())` on success, or an `H3Error` on failure.
 // This is the Rust port of C's `_localIJKToH3`
-pub(crate) fn local_ijk_to_cell(origin: H3Index, ijk: &CoordIJK, out_h3: &mut H3Index) -> Result<(), H3Error> {
+// Let's define these as C does, then use them.
+// For now, I'll assume PENTAGON_ROTATIONS, PENTAGON_ROTATIONS_REVERSE_NONPOLAR, PENTAGON_ROTATIONS_REVERSE_POLAR are defined
+// as in the provided Rust files. The C PENTAGON_ROTATIONS_REVERSE seems to map to our Rust PENTAGON_ROTATIONS
+// when used for the `originOnPent && indexOnPent && dir == CENTER_DIGIT` case, applied CCW.
+pub fn local_ijk_to_cell(origin: H3Index, ijk: &CoordIJK, out_h3: &mut H3Index) -> Result<(), H3Error> {
+  eprintln!(
+    "  DEBUG: local_ijk_to_cell called with origin=0x{:x}, ijk={:?}",
+    origin.0, ijk
+  );
+  // ... (rest of the function, with its own eprint before returning Ok or Err) ...
+  // At the end of local_ijk_to_cell, before `Ok(())` or `Err(...)`:
+  // eprintln!("    DEBUG: local_ijk_to_cell: output H3 = 0x{:x}", out_h3.0);
+
   let res = get_resolution(origin);
   let origin_base_cell = get_base_cell(origin);
   let origin_is_pent = _is_base_cell_pentagon(origin_base_cell);
 
-  // Convert origin to its canonical FaceIJK
   let mut fijk_origin_canonical = FaceIJK::default();
   _h3_to_face_ijk(origin, &mut fijk_origin_canonical)?;
+  eprintln!(
+    "    DEBUG: local_ijk_to_cell: fijk_origin_canonical = {:?}",
+    fijk_origin_canonical
+  );
 
-  // Add the local IJK vector to the origin's canonical IJK coordinates
-  // This gives the target cell's IJK coordinates, but still on the origin's canonical face plane.
   let mut fijk_target_on_origin_plane = fijk_origin_canonical;
-  let original_coord = fijk_target_on_origin_plane.coord;
-  _ijk_add(&original_coord, ijk, &mut fijk_target_on_origin_plane.coord);
+  let temp_coord = fijk_target_on_origin_plane.coord; // Copy for _ijk_add
+  _ijk_add(&temp_coord, ijk, &mut fijk_target_on_origin_plane.coord);
   _ijk_normalize(&mut fijk_target_on_origin_plane.coord);
+  eprintln!(
+    "    DEBUG: local_ijk_to_cell: fijk_target_on_origin_plane (after add & norm) = {:?}",
+    fijk_target_on_origin_plane
+  );
 
-  // This fijk_target_on_origin_plane is now an absolute Fijk (face + IJK on that face).
-  // Convert it to an H3 index. _face_ijk_to_h3 handles overages and rotations.
   *out_h3 = _face_ijk_to_h3(&fijk_target_on_origin_plane, res);
+  eprintln!(
+    "    DEBUG: local_ijk_to_cell: _face_ijk_to_h3 initial result H3 = 0x{:x}",
+    out_h3.0
+  );
 
   if *out_h3 == H3_NULL {
-    return Err(H3Error::Failed); // Could not convert Fijk to H3 (likely out of bounds)
+    eprintln!("    DEBUG: local_ijk_to_cell -> Failed (_face_ijk_to_h3 returned NULL)");
+    return Err(H3Error::Failed);
   }
 
-  // The _face_ijk_to_h3 conversion might place the index on a different base cell
-  // than the origin. If pentagon distortion needs to be "undone", it's complex.
-  // The C code's _localIJKToH3 has specific logic for undoing pentagon rotations.
-
+  // Pentagon un-distortion (reverse of cell_to_local_ijk)
   let index_base_cell = get_base_cell(*out_h3);
   let index_is_pent = _is_base_cell_pentagon(index_base_cell);
 
   if origin_is_pent || index_is_pent {
+    eprintln!(
+      "    DEBUG: local_ijk_to_cell: Pentagon un-distortion logic. OriginPent={}, IndexPent={}",
+      origin_is_pent, index_is_pent
+    );
+    let origin_center_digit = _h3_leading_non_zero_digit(origin);
+
     if origin_base_cell == index_base_cell {
-      // Both on same pentagonal base cell
       if origin_is_pent {
-        // (which implies index_is_pent is also true if it's the center)
-        let origin_center_digit = _h3_leading_non_zero_digit(origin);
+        // Implies index is also on same pentagon BC
         let index_center_digit = _h3_leading_non_zero_digit(*out_h3);
-
-        // This case may be covered by _face_ijk_to_h3 canonicalization, but C has explicit reverse rotation.
-        // The rotations applied in cellToLocalIjk must be inverted.
+        eprintln!(
+          "      DEBUG: Both on same pentagon BC. OriginLeading={:?}, IndexLeading={:?}",
+          origin_center_digit, index_center_digit
+        );
         if FAILED_DIRECTIONS[origin_center_digit as usize][index_center_digit as usize] {
+          eprintln!("      DEBUG: FAILED_DIRECTIONS check failed for same BC pentagon case.");
+          return Err(H3Error::Pentagon); // Should match error from cell_to_local_ijk
+        }
+        let num_rotations_cw_orig = PENTAGON_ROTATIONS[origin_center_digit as usize][index_center_digit as usize];
+        if num_rotations_cw_orig == -1 {
+          eprintln!("      DEBUG: num_rotations_cw_orig was -1");
           return Err(H3Error::Pentagon);
         }
-        let num_rotations_cw = PENTAGON_ROTATIONS[origin_center_digit as usize][index_center_digit as usize];
-        if num_rotations_cw == -1 {
-          return Err(H3Error::Pentagon);
-        }
-        for _ in 0..num_rotations_cw {
-          *out_h3 = _h3_rotate_pent60_ccw(*out_h3); // Reverse of CW is CCW
-        }
+        for _ in 0..num_rotations_cw_orig {
+          *out_h3 = _h3_rotate_pent60_ccw(*out_h3);
+        } // Reverse CW with CCW
+        eprintln!(
+          "      DEBUG: Applied {} CCW rotations (reverse of same BC pent). New H3 = 0x{:x}",
+          num_rotations_cw_orig, out_h3.0
+        );
       }
-      // If only index_is_pent but not origin_is_pent (and same BC), then origin must be hex child of pent.
-      // This case should be simple as no cross-BC distortion to undo.
     } else {
-      // Different base cells, one of them is a pentagon
-      let dir_between_bcs = _get_base_cell_direction(origin_base_cell, index_base_cell);
-      if dir_between_bcs == Direction::InvalidDigit {
-        // This means _face_ijk_to_h3 produced an index on a non-neighboring base cell,
-        // likely due to very large IJK input.
+      // Different base cells
+      let dir_to_index_bc = _get_base_cell_direction(origin_base_cell, index_base_cell);
+      if dir_to_index_bc == Direction::InvalidDigit {
+        eprintln!("      DEBUG: dir_to_index_bc was InvalidDigit");
         return Err(H3Error::Failed);
-      }
+      } // Should not happen if _face_ijk_to_h3 was good
 
       if origin_is_pent {
-        let origin_center_digit = _h3_leading_non_zero_digit(origin);
-        if FAILED_DIRECTIONS[origin_center_digit as usize][dir_between_bcs as usize] {
+        eprintln!(
+          "      DEBUG: Origin is pent, index hex. DirToIdxBC={:?}",
+          dir_to_index_bc
+        );
+        if FAILED_DIRECTIONS[origin_center_digit as usize][dir_to_index_bc as usize] {
+          eprintln!("      DEBUG: FAILED_DIRECTIONS check failed for origin_is_pent case.");
           return Err(H3Error::Pentagon);
         }
-        let num_rotations_cw = PENTAGON_ROTATIONS[origin_center_digit as usize][dir_between_bcs as usize];
-        if num_rotations_cw == -1 {
+        let num_rotations_cw_orig = PENTAGON_ROTATIONS[origin_center_digit as usize][dir_to_index_bc as usize];
+        if num_rotations_cw_orig == -1 {
+          eprintln!("      DEBUG: num_rotations_cw_orig was -1 for origin_is_pent.");
           return Err(H3Error::Pentagon);
         }
-        for _ in 0..num_rotations_cw {
+        for _ in 0..num_rotations_cw_orig {
           *out_h3 = _h3_rotate_pent60_ccw(*out_h3);
         }
+        eprintln!(
+          "      DEBUG: Applied {} CCW rotations (reverse of origin_is_pent). New H3 = 0x{:x}",
+          num_rotations_cw_orig, out_h3.0
+        );
       } else {
-        // index_is_pent is true
-        let index_center_digit = _h3_leading_non_zero_digit(*out_h3);
-        let dir_from_pent_to_origin = _get_base_cell_direction(index_base_cell, origin_base_cell);
-        if FAILED_DIRECTIONS[index_center_digit as usize][dir_from_pent_to_origin as usize] {
-          return Err(H3Error::Pentagon);
+        // index_is_pent, origin_is_hex
+        let index_leading_digit = _h3_leading_non_zero_digit(*out_h3); // Leading digit of the PENTAGONAL cell *out_h3*
+        let dir_from_pent_to_origin_bc = _get_base_cell_direction(index_base_cell, origin_base_cell);
+        if dir_from_pent_to_origin_bc == Direction::InvalidDigit {
+          eprintln!("      DEBUG: dir_from_pent_to_origin_bc was InvalidDigit");
+          return Err(H3Error::Failed);
         }
 
+        eprintln!(
+          "      DEBUG: Index is pent, origin hex. IndexLeading={:?}, DirFromPentToOriginBC={:?}",
+          index_leading_digit, dir_from_pent_to_origin_bc
+        );
+
+        if FAILED_DIRECTIONS[index_leading_digit as usize][dir_from_pent_to_origin_bc as usize] {
+          eprintln!("      DEBUG: FAILED_DIRECTIONS check failed for index_is_pent case.");
+          return Err(H3Error::Pentagon);
+        }
         let rotations_table_ref = if crate::base_cells::_is_base_cell_polar_pentagon(index_base_cell) {
           &PENTAGON_ROTATIONS_REVERSE_POLAR
         } else {
           &PENTAGON_ROTATIONS_REVERSE_NONPOLAR
         };
-        let num_rotations_ccw = rotations_table_ref[dir_from_pent_to_origin as usize][index_center_digit as usize];
-        if num_rotations_ccw == -1 {
+        let num_rotations_ccw_orig =
+          rotations_table_ref[dir_from_pent_to_origin_bc as usize][index_leading_digit as usize];
+        if num_rotations_ccw_orig == -1 {
+          eprintln!("      DEBUG: num_rotations_ccw_orig was -1 for index_is_pent.");
           return Err(H3Error::Pentagon);
         }
-        for _ in 0..num_rotations_ccw {
-          *out_h3 = _h3_rotate_pent60_cw(*out_h3); // Reverse of CCW is CW
-        }
+        for _ in 0..num_rotations_ccw_orig {
+          *out_h3 = _h3_rotate_pent60_cw(*out_h3);
+        } // Reverse CCW with CW
+        eprintln!(
+          "      DEBUG: Applied {} CW rotations (reverse of index_is_pent). New H3 = 0x{:x}",
+          num_rotations_ccw_orig, out_h3.0
+        );
       }
     }
   }
+  eprintln!(
+    "DEBUG: local_ijk_to_cell for origin=0x{:x}, ijk={:?} FINISHED, output H3 = 0x{:x}",
+    origin.0, ijk, out_h3.0
+  );
   Ok(())
 }
 

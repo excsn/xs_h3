@@ -44,6 +44,7 @@ pub use types::{
   Vec2d, Vec3d, H3_NULL,
 };
 
+pub use h3_index::{get_resolution};
 pub use h3_index::inspection::{
   get_base_cell_number,
   get_icosahedron_faces,

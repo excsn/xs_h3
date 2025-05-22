@@ -25,16 +25,16 @@ pub const EPSILON_DEG: f64 = 0.000_000_001;
 /// Epsilon for floating point comparisons. ~0.1mm in radians.
 pub const EPSILON_RAD: f64 = EPSILON_DEG * M_PI_180;
 
-/// sqrt(3) / 2.0, also known as sin(60 degrees)
-pub const M_SQRT3_2: f64 = 0.866_025_403_784_438_6; // Equivalent to consts::SQRT_3 / 2.0;
+// M_SQRT3_2 = sqrt(3.0) / 2.0, also known as sin(60 degrees)
+pub const M_SQRT3_2: f64 = 0.866_025_403_784_438_6; // From std::f64::consts::SQRT_3 / 2.0 or direct C value
 
 /// Square root of 7.
 pub const M_SQRT7: f64 = 2.645_751_311_064_590_6; // sqrt(7.0)
 /// Reciprocal of the square root of 7 (1 / sqrt(7)).
 pub const M_RSQRT7: f64 = 1.0 / M_SQRT7; // 0.3779644730092272
 
-/// 1 / sin(60 degrees)
-pub const M_RSIN60: f64 = 1.0 / M_SQRT3_2;
+// M_RSIN60 = 1.0 / M_SQRT3_2,  1 / sin(60 degrees)
+pub const M_RSIN60: f64 = 1.154_700_538_379_251_5; // From 1.0 / (std::f64::consts::SQRT_3 / 2.0) or C value
 
 /// One third
 pub const M_ONETHIRD: f64 = 1.0 / 3.0;

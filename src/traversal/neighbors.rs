@@ -14,6 +14,7 @@ use crate::base_cells::{
 use crate::constants::{H3_CELL_MODE, MAX_H3_RES, NUM_BASE_CELLS};
 use crate::coords::ijk::_rotate60_ccw;
 use crate::types::Direction;
+use crate::{is_pentagon, H3_NULL};
 
 use crate::h3_index::{
   _h3_leading_non_zero_digit, _h3_rotate60_ccw, _h3_rotate60_cw, _h3_rotate_pent60_ccw, get_base_cell, get_index_digit,
@@ -118,7 +119,13 @@ pub(crate) fn h3_neighbor_rotations(
   let mut r = get_resolution(current_h) - 1; // Resolution of the parent cell.
   loop {
     if r == -1 {
-      // Base cell level
+      // `dir` here is the original input `dir` parameter possibly rotated by `*rotations`
+      if _is_base_cell_pentagon(old_base_cell) && dir == Direction::KAxes {
+        // Explicitly cannot move in K_AXES direction from a pentagon at base cell level.
+        // This matches behavior of some H3 library versions.
+        return Err(H3Error::Pentagon);
+      }
+
       set_base_cell(
         &mut current_h,
         BASE_CELL_NEIGHBORS[old_base_cell as usize][dir as usize],
@@ -126,19 +133,31 @@ pub(crate) fn h3_neighbor_rotations(
       new_rotations = BASE_CELL_NEIGHBOR_60CCW_ROTS[old_base_cell as usize][dir as usize];
 
       if get_base_cell(current_h) == INVALID_BASE_CELL {
-        // Adjust for the deleted k vertex at the base cell level.
-        // This edge actually borders a different neighbor.
+        // This implies origin was a hexagon, and 'dir' was K_AXES pointing to a pentagon.
+        // Or, origin was pentagon, 'dir' was not K_AXES, but the neighbor lookup still failed (should not happen).
+        // If origin was pentagon and dir was K, it's already handled above.
+        // So, this path is for: Hexagon origin, dir=K, new_base_cell is a pentagon.
+
+        // The C "fixup" logic:
+        // We were trying to go in `dir` (which was K) from `old_base_cell` (hexagon).
+        // This led to an invalid base cell, meaning the K-neighbor is a pentagon.
+        // We must use an alternative path, IK_AXES_DIGIT, and adjust rotations.
+        // Note: This adjustment is for the *digits* of current_h, which still holds origin's digits.
+
+        // Set to IK neighbor instead
         set_base_cell(
-          &mut current_h,
+          &mut current_h, // current_h at this point has old_base_cell, but its digits are from origin
           BASE_CELL_NEIGHBORS[old_base_cell as usize][Direction::IkAxes as usize],
         );
         new_rotations = BASE_CELL_NEIGHBOR_60CCW_ROTS[old_base_cell as usize][Direction::IkAxes as usize];
 
-        // Perform the adjustment for the k-subsequence we're skipping over.
+        // The digits of current_h (still origin's digits) need to be rotated as if we went via IK.
+        // The C code also applies _h3Rotate60ccw(out) to the digits here.
         current_h = _h3_rotate60_ccw(current_h);
+        // And the overall rotation count for subsequent levels is also adjusted.
         *rotations = (*rotations + 1) % 6;
       }
-      break;
+      break; // Exited loop for r
     } else {
       let old_digit = get_index_digit(current_h, r + 1);
       let next_dir: Direction;
@@ -238,48 +257,59 @@ pub(crate) fn h3_neighbor_rotations(
 /// if the cells are not neighbors.
 // This is `directionForNeighbor` in C.
 pub(crate) fn direction_for_neighbor(origin: H3Index, destination: H3Index) -> Direction {
-  // Check if the cells are invalid or not of the same resolution.
-  // While h3NeighborRotations will catch some of these, it's good practice
-  // for a standalone utility.
-  if crate::h3_index::get_mode(origin) != H3_CELL_MODE
-    || crate::h3_index::get_mode(destination) != H3_CELL_MODE
-    || crate::h3_index::get_resolution(origin) != crate::h3_index::get_resolution(destination)
-  {
-    return Direction::InvalidDigit;
-  }
+  eprintln!(
+    "  DI_FOR_NB: direction_for_neighbor called with origin=0x{:x}, destination=0x{:x}",
+    origin.0, destination.0
+  );
+
   if origin == destination {
-    return Direction::Center; // Or InvalidDigit depending on desired semantics for self
-                              // C's directionForNeighbor implies it's for actual *neighbors*
-                              // and would likely fail to find Center if it loops 1-6.
-                              // Let's match C's typical usage: finding a non-center direction.
+    eprintln!("    DI_FOR_NB: Origin and destination are the same. Returning Center.");
+    return Direction::Center;
   }
 
-  let is_pent = _is_base_cell_pentagon(get_base_cell(origin)); // Use base_cells internal directly
+  let is_pent = is_pentagon(origin); // is_pentagon from h3_index::inspection
+  eprintln!("    DI_FOR_NB: is_pentagon(origin) = {}", is_pent);
 
-  // Iterate through all possible directions from the origin.
-  // Skip K_AXES_DIGIT (1) for pentagons as it's a deleted subsequence.
-  // Directions are 1 through 6.
-  for dir_val in 1..=6 {
-    let dir: Direction = unsafe { std::mem::transmute(dir_val as u8) }; // Safe as 1-6 are valid
-    if is_pent && dir == Direction::KAxes {
-      continue;
-    }
+  let start_dir_u8: u8 = if is_pent {
+    Direction::JAxes as u8
+  } else {
+    Direction::KAxes as u8
+  };
+  // Valid H3 directions for neighbors are K, J, JK, I, IK, IJ (1 through 6)
+  // Loop from start_dir_u8 up to IJ_AXES_DIGIT (6)
+  for dir_val in start_dir_u8..=(Direction::IjAxes as u8) {
+    let direction = match Direction::try_from(dir_val) {
+      Ok(d) => d,
+      Err(_) => continue, // Should not happen if loop is 1..=6 or 2..=6
+    };
+    eprintln!("    DI_FOR_NB: Testing direction {:?}", direction);
 
-    let mut rotations = 0; // Initial rotations don't matter for this check
-    let mut neighbor = H3Index(0);
+    let mut neighbor: H3Index = H3_NULL; // Initialize
+    let mut rotations = 0; // Does not affect which neighbor is found, only its final orientation relative to origin's system
 
-    // h3_neighbor_rotations can fail if origin is invalid or dir is invalid for pentagons,
-    // but we've handled those above. The main failure here would be internal logic errors.
-    if h3_neighbor_rotations(origin, dir, &mut rotations, &mut neighbor).is_ok() {
-      if neighbor == destination {
-        return dir;
+    let neighbor_result = h3_neighbor_rotations(origin, direction, &mut rotations, &mut neighbor);
+
+    eprintln!(
+      "    DI_FOR_NB: h3_neighbor_rotations(0x{:x}, {:?}, ...) yielded H3 = 0x{:x}, rotations_out = {}, err = {:?}",
+      origin.0, direction, neighbor.0, rotations, neighbor_result
+    );
+
+    if neighbor_result.is_ok() && neighbor == destination {
+      eprintln!("    DI_FOR_NB: FOUND neighbor in direction {:?}", direction);
+      return direction;
+    } else {
+      if neighbor_result.is_err() && neighbor_result != Err(H3Error::Pentagon) {
+        // Log unexpected errors from h3_neighbor_rotations
+        eprintln!(
+          "    DI_FOR_NB: h3_neighbor_rotations errored unexpectedly for direction {:?}: {:?}",
+          direction, neighbor_result
+        );
       }
     }
-    // If h3_neighbor_rotations itself errors (e.g. E_PENTAGON if we landed in a deleted
-    // subsequence when we shouldn't have), we just continue checking other directions.
   }
 
-  Direction::InvalidDigit // Not a direct neighbor
+  eprintln!("    DI_FOR_NB: Did not find direct neighbor after checking all valid directions.");
+  Direction::InvalidDigit
 }
 
 /// Returns whether or not the provided H3 cells are neighbors.
@@ -321,14 +351,26 @@ pub fn are_neighbor_cells(origin: H3Index, destination: H3Index) -> Result<bool,
   if !crate::h3_index::inspection::is_valid_cell(origin) || !crate::h3_index::inspection::is_valid_cell(destination) {
     return Err(H3Error::CellInvalid);
   }
-
-  // `direction_for_neighbor` will return `Direction::InvalidDigit` if they aren't neighbors.
+  let dir = direction_for_neighbor(origin, destination);
+  let result = dir != Direction::InvalidDigit;
+  eprintln!(
+    "ARE_NEIGHBOR_CELLS_DEBUG: origin={:x}, dest={:x}, dir_found={:?}, result={}",
+    origin.0, destination.0, dir, result
+  );
+  // This relies heavily on the base cells
   Ok(direction_for_neighbor(origin, destination) != Direction::InvalidDigit)
+  // From C tests, H3 library's _areNeighborCells function *always* calculates
+  // the neighbor direction AND returns E_SUCCESS regardless of direction's validity
 
-  // Alternate C implementation detail:
-  // The C code's `areNeighborCells` also uses `gridDisk(origin, 1, ...)`
-  // as a fallback if the parent-check optimization doesn't yield a result.
-  // Our `direction_for_neighbor` is essentially doing a targeted k-ring of 1 check.
+  // Original code
+  // let mut out = 0;
+  // neighborResult.map(|_ok_val| out = 1).map_err(|err| {
+  //     if err == H3Error::NotNeighbors && !isPentagon(origin) {
+  //         return err;
+  //     }
+  //     H3Error::Failed
+  // })?;
+  // Ok(out == 1)
 }
 
 #[cfg(test)]
@@ -336,9 +378,9 @@ mod tests {
   use super::*;
   use crate::h3_index; // For direct access to setters/getters if needed for test setup
   use crate::indexing::lat_lng_to_cell; // Assuming this is pub from indexing
-  use crate::latlng::{_set_geo_degs};
-  use crate::types::LatLng;
+  use crate::latlng::_set_geo_degs;
   use crate::traversal::grid_disk::grid_disk;
+  use crate::types::LatLng;
   use crate::types::H3_NULL; // Assuming grid_disk is ported and available
 
   #[test]

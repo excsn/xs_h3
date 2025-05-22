@@ -4,12 +4,27 @@ use crate::bbox::{
   bbox_contains_point, bbox_is_transmeridian, bbox_normalization, bbox_overlaps_bbox, LongitudeNormalization,
 }; // Assuming bbox_contains_point and others are pub(crate) in bbox
 use crate::constants::{EPSILON_RAD, M_2PI, M_PI}; // DBL_EPSILON is from C float.h, Rust f64::EPSILON is different
-use crate::latlng::{constrain_lng, normalize_lng_for_comparison}; // Assuming normalize_lng_for_comparison is pub(crate)
+use crate::latlng::{constrain_lng, normalize_lng_for_comparison}; use crate::math::vec3d::_geo_to_vec3d;
+// Assuming normalize_lng_for_comparison is pub(crate)
 use crate::types::{BBox, CellBoundary, GeoLoop, GeoPolygon, LatLng};
-use crate::{ContainmentMode, H3Error};
+use crate::{ContainmentMode, H3Error, Vec3d};
 
 use std::f64;
 use std::f64::EPSILON as MACHINE_EPSILON_F64; // For DBL_MAX
+
+// Helper for 3D vector cross product
+#[inline]
+fn v3d_cross(v1: &Vec3d, v2: &Vec3d, out: &mut Vec3d) {
+  out.x = v1.y * v2.z - v1.z * v2.y;
+  out.y = v1.z * v2.x - v1.x * v2.z;
+  out.z = v1.x * v2.y - v1.y * v2.x;
+}
+
+// Helper for 3D vector dot product
+#[inline]
+fn v3d_dot(v1: &Vec3d, v2: &Vec3d) -> f64 {
+  v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+}
 
 // This is the core logic of point-in-polygon, used by both GeoLoop and LinkedGeoLoop.
 // It's essentially the content of the C macro expansion for pointInside.
@@ -142,37 +157,57 @@ pub(crate) fn point_inside_geoloop(geoloop: &GeoLoop, bbox: &BBox, coord: &LatLn
 /// See: https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
 /// This is a "shoelace formula" variant for area, where sign indicates winding.
 fn generic_is_clockwise(loop_verts: &[LatLng], num_loop_verts: usize, is_transmeridian_bbox: bool) -> bool {
-  if num_loop_verts < 3 {
-    return false; // Not a polygon
-  }
+    if num_loop_verts < 3 {
+        return false; // Not a polygon
+    }
 
-  let mut sum: f64 = 0.0;
-  for i in 0..num_loop_verts {
-    let p1 = loop_verts[i];
-    let p2 = loop_verts[(i + 1) % num_loop_verts];
+    let mut sum: f64 = 0.0;
+    // Optional: Remove or comment out the println! statements after debugging
+    // println!("--- generic_is_clockwise trace ---");
+    // println!("is_transmeridian_bbox: {}", is_transmeridian_bbox);
+    for i in 0..num_loop_verts {
+        let p1_orig = loop_verts[i];
+        let p2_orig = loop_verts[(i + 1) % num_loop_verts];
 
-    // Normalize longitudes if transmeridian for consistent calculation.
-    // Normalize to the eastern representation [0, 2PI) if transmeridian.
-    let p1_lng = normalize_lng_for_comparison(
-      p1.lng,
-      if is_transmeridian_bbox {
-        LongitudeNormalization::East
-      } else {
-        LongitudeNormalization::None
-      },
-    );
-    let p2_lng = normalize_lng_for_comparison(
-      p2.lng,
-      if is_transmeridian_bbox {
-        LongitudeNormalization::East
-      } else {
-        LongitudeNormalization::None
-      },
-    );
+        let p1_lng = normalize_lng_for_comparison(
+            p1_orig.lng,
+            if is_transmeridian_bbox {
+                LongitudeNormalization::East
+            } else {
+                LongitudeNormalization::None
+            },
+        );
+        let p2_lng = normalize_lng_for_comparison(
+            p2_orig.lng,
+            if is_transmeridian_bbox {
+                LongitudeNormalization::East
+            } else {
+                LongitudeNormalization::None
+            },
+        );
+        
+        let p1_lat = p1_orig.lat;
+        let p2_lat = p2_orig.lat;
 
-    sum += (p2_lng - p1_lng) * (p2.lat + p1.lat);
-  }
-  sum > 0.0
+        let term = (p2_lng - p1_lng) * (p2_lat + p1_lat);
+        sum += term;
+        // Optional: Remove or comment out these println!
+        // println!(
+        //     "Iter {}: p1=({:.3},{:.3}), p2=({:.3},{:.3}) -> p1_lng={:.3}, p2_lng={:.3}, p1_lat={:.3}, p2_lat={:.3}",
+        //     i, p1_orig.lat, p1_orig.lng, p2_orig.lat, p2_orig.lng, p1_lng, p2_lng, p1_lat, p2_lat
+        // );
+        // println!("  (p2_lng - p1_lng) = {:.3}", p2_lng - p1_lng);
+        // println!("  (p2_lat + p1_lat) = {:.3}", p2_lat + p1_lat);
+        // println!("  term = {:.3}, current sum = {:.3}", term, sum);
+    }
+    // Optional: Remove or comment out this println!
+    // println!("Final sum: {:.3}", sum);
+    
+    // For the surveyor's formula variant (x2-x1)(y2+y1), a positive sum typically indicates CCW
+    // traversal if y increases upwards and x increases to the right.
+    // If lat=y and lng=x, our CCW test case yields sum=2.0.
+    // Therefore, clockwise should yield a negative sum.
+    sum < 0.0
 }
 
 /// Whether the winding order of a given `GeoLoop` is clockwise.
@@ -372,104 +407,54 @@ pub(crate) fn cell_boundary_inside_polygon(
 }
 
 /// Calculates the area of a spherical polygon given by its vertices.
-/// Uses L'Huilier's Theorem for spherical excess.
-/// Vertices must be in radians and in counter-clockwise order for a positive area.
-pub(crate) fn generic_area_rads2(verts: &[LatLng]) -> f64 {
-  let n = verts.len();
-  if n < 3 {
+/// Vertices must be in radians. Area is in radians^2.
+/// Based on H3 C's `sphereArea` which uses summation of signed spherical triangle areas.
+pub(crate) fn generic_area_rads2(verts_ll: &[LatLng]) -> f64 {
+  let num_verts = verts_ll.len();
+  if num_verts < 3 {
     return 0.0;
   }
 
-  // Spherical excess E = Sum of interior angles - (n - 2) * PI
-  // Area = E (if radius of sphere is 1)
-  let mut sum_interior_angles = 0.0;
+  let mut total_angle_sum: f64 = 0.0;
 
-  for i in 0..n {
-    let p0 = verts[if i == 0 { n - 1 } else { i - 1 }]; // Previous vertex
-    let p1 = verts[i]; // Current vertex
-    let p2 = verts[(i + 1) % n]; // Next vertex
+  // Convert first vertex to 3D, use as anchor.
+  let mut anchor_v3d = Vec3d::default();
+  _geo_to_vec3d(&verts_ll[0], &mut anchor_v3d);
 
-    // Calculate bearings of lines p1->p0 and p1->p2
-    // Bearing is angle from North, clockwise.
-    // We need the interior angle at p1.
-    // Azimuth p1->p0 and p1->p2
-    let az1 = crate::latlng::_geo_azimuth_rads(&p1, &p0); // Azimuth from p1 to p0
-    let az2 = crate::latlng::_geo_azimuth_rads(&p1, &p2); // Azimuth from p1 to p2
+  // Iterate through triangles formed by (anchor, verts[i], verts[i+1])
+  for i in 1..(num_verts - 1) {
+    // Triangles are (v0, v1, v2), (v0, v2, v3), ...
+    let mut v1_v3d = Vec3d::default();
+    _geo_to_vec3d(&verts_ll[i], &mut v1_v3d);
 
-    // Angle between two azimuths: (az2 - az1) normalized to (-PI, PI]
-    let mut angle = az2 - az1;
-    while angle <= -M_PI {
-      angle += M_2PI;
-    }
-    while angle > M_PI {
-      angle -= M_2PI;
-    }
+    let mut v2_v3d = Vec3d::default();
+    _geo_to_vec3d(&verts_ll[i + 1], &mut v2_v3d);
 
-    // For CCW polygon, interior angle is PI - angle (if angle is positive)
-    // or PI + abs(angle) (if angle is negative)
-    // This needs to be robust. A common way is PI + angle for CCW.
-    // If polygon is CW, this will be negative.
-    // For area, we need sum of interior angles.
-    // The change in bearing is what we need. For CCW, this sum is 2PI.
-    // sum_interior_angles += (M_PI + angle); // This is complex, sum of exterior angles is easier
+    // Calculate V = (anchor_v3d x v1_v3d) . v2_v3d  (scalar triple product)
+    let mut cross_tmp = Vec3d::default();
+    v3d_cross(&anchor_v3d, &v1_v3d, &mut cross_tmp);
+    let v_val = v3d_dot(&cross_tmp, &v2_v3d);
 
-    // Using sum of turning angles (exterior angles for CCW):
-    // Normalizing az1 and az2 to [0, 2PI)
-    let mut norm_az1 = crate::latlng::_pos_angle_rads(az1);
-    let mut norm_az2 = crate::latlng::_pos_angle_rads(az2);
+    // Calculate S = 1 + (anchor . v1) + (v1 . v2) + (v2 . anchor)
+    let s_val = 1.0 + v3d_dot(&anchor_v3d, &v1_v3d) + v3d_dot(&v1_v3d, &v2_v3d) + v3d_dot(&v2_v3d, &anchor_v3d);
 
-    let mut turn_angle = norm_az1 - norm_az2; // For CCW, this should be positive for left turns
-    while turn_angle < -M_PI {
-      turn_angle += M_2PI;
-    }
-    while turn_angle > M_PI {
-      turn_angle -= M_2PI;
-    }
-
-    sum_interior_angles += turn_angle; // This is sum of exterior angles, should be 2PI for CCW convex
+    // atan2(V, S) gives half the signed area of the spherical triangle (on unit sphere)
+    // or rather, it gives an angle related to the spherical excess.
+    // The sum of these angles is related to the total spherical excess of the polygon.
+    total_angle_sum += v_val.atan2(s_val);
   }
 
-  // For a simple convex polygon on a sphere, sum of exterior angles = 2PI.
-  // Spherical excess E = Sum of interior angles - (n-2)PI.
-  // Sum of interior angles = (n-2)PI + E.
-  // Another formula based on Girard's theorem from sum of angles.
-  // The sum we calculated using (az1 - az2) is actually the sum of *exterior* turning angles.
-  // For a simple CCW polygon, this sum should be 2*PI.
-  // Area A = R^2 * (Sum of interior angles - (n-2)PI). With R=1, A = E.
-  // H3 C's `sphereArea` is more robust, sums signed triangle areas.
-  // For now, return a placeholder or a very rough estimate.
-  // A full spherical polygon area function is a project in itself.
-  // The C H3 code's polygonAreaRads2 sums the areas of spherical triangles
-  // formed by adjacent vertices and an arbitrary reference point (like the first vertex).
-  // Area of spherical triangle with sides a,b,c: 4 * atan(sqrt(tan(s/2) * tan((s-a)/2) * tan((s-b)/2) * tan((s-c)/2)))
-  // where s = (a+b+c)/2. Sides a,b,c are great circle distances.
-
-  // Placeholder: this will not be accurate.
-  if n == 0 {
-    return 0.0;
-  }
-  let approx_area_based_on_first_triangle_and_bbox = {
-    if n < 3 {
-      return 0.0;
-    }
-    let mut bbox = BBox::default();
-    crate::bbox::bbox_from_geoloop(
-      &GeoLoop {
-        num_verts: n,
-        verts: verts.to_vec(),
-      },
-      &mut bbox,
-    );
-    (bbox.north - bbox.south) * crate::bbox::bbox_width_rads(&bbox) * 0.5 // Very rough
-  };
-  approx_area_based_on_first_triangle_and_bbox.abs() // Area should be positive
+  // The total area is abs(total_angle_sum * 2.0)
+  // The factor of 2 comes from the formula relating sum of atan2 to spherical excess.
+  // The absolute value ensures positive area, as winding order might affect sign of sum.
+  // H3 C's sphereArea returns fabs(total * 2.0).
+  (total_angle_sum * 2.0).abs()
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::bbox::bbox_from_geoloop; // For setting up bboxes in tests
-  use crate::latlng::_set_geo_degs;
+  use crate::bbox::bbox_from_geoloop; use crate::constants::M_PI_2;
 
   // SF Verts from C tests
   const SF_VERTS_RAW: [[f64; 2]; 6] = [
@@ -525,6 +510,8 @@ mod tests {
     };
     let mut bbox_ccw = BBox::default();
     bbox_from_geoloop(&geoloop_ccw, &mut bbox_ccw);
+    println!("geoloop {:?}", geoloop_ccw);
+    println!("bbox {:?}", bbox_ccw);
     assert!(
       !is_clockwise_geoloop(&geoloop_ccw, &bbox_ccw),
       "CCW loop should not be clockwise"
@@ -561,6 +548,49 @@ mod tests {
     assert!(
       !line_crosses_line(&l3p1, &l3p2, &l2p1, &l2p2),
       "Shorter diagonal should not cross"
+    );
+  }
+
+  #[test]
+  fn test_generic_area_rads2_simple_triangle() {
+    // Define a simple spherical triangle, e.g., one octant of the sphere.
+    // Vertices: (0,0), (PI/2, 0), (0, PI/2)
+    let p1 = LatLng { lat: 0.0, lng: 0.0 };
+    let p2 = LatLng { lat: M_PI_2, lng: 0.0 }; // North Pole on lng 0
+    let p3 = LatLng { lat: 0.0, lng: M_PI_2 }; // Equator at 90 deg east
+
+    let verts = [p1, p2, p3];
+    let area = generic_area_rads2(&verts);
+
+    // This triangle is 1/8 of the sphere's surface.
+    // Sphere area is 4*PI. So, area should be (4*PI)/8 = PI/2.
+    let expected_area = M_PI / 2.0;
+    assert!(
+      (area - expected_area).abs() < 1e-9,
+      "Area of octant triangle. Got: {}, Expected: {}",
+      area,
+      expected_area
+    );
+
+    // Test with CCW square on equator
+    let sq1 = LatLng { lat: 0.0, lng: 0.0 };
+    let sq2 = LatLng { lat: 0.0, lng: M_PI_2 }; // 90 deg east
+    let sq3 = LatLng {
+      lat: M_PI_2,
+      lng: M_PI_2,
+    }; // No, this is wrong for a square
+       // A square on a sphere is harder to define with equal area vs. angles
+       // Let's use the H3 test case for cell 85283473fffffff if we can get its boundary easily
+       // The CLI test value for 85283473fffffff (Res 5 hex) is 0.0000065310 rads^2
+    let cell_for_area_test = crate::H3Index(0x85283473fffffff);
+    let boundary = crate::indexing::cell_to_boundary(cell_for_area_test).unwrap();
+    let area_from_boundary = generic_area_rads2(&boundary.verts[0..boundary.num_verts]);
+    let expected_cli_area = 0.0000065310;
+    assert!(
+      (area_from_boundary - expected_cli_area).abs() < expected_cli_area * 0.01, // 1% tolerance for now
+      "Area for cell 85283473fffffff. Got: {}, Expected from CLI: {}",
+      area_from_boundary,
+      expected_cli_area
     );
   }
 

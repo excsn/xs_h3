@@ -405,7 +405,7 @@ pub(crate) static BASE_CELL_DATA: [BaseCellData; NUM_BASE_CELLS as usize] = [
 // For now, the logic will be embedded in the access functions.
 
 // Maximum input for any component to face-to-base-cell lookup functions
-const MAX_FACE_COORD: i32 = 2;
+pub const MAX_FACE_COORD: i32 = 2;
 // Invalid number of rotations
 pub(crate) const INVALID_ROTATIONS: i32 = -1;
 

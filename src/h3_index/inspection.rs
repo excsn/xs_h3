@@ -581,4 +581,59 @@ mod tests {
     crate::h3_index::_set_h3_index(&mut h_res4, 4, 0, Direction::Center); // Res 4 is Class II
     assert!(!is_res_class_iii(h_res4));
   }
+
+  #[test]
+  fn test_get_base_cell_for_specific_failing_h3index() {
+    let h_origin = H3Index(0x855943cbfffffff);
+    let expected_base_cell = 44;
+
+    // Print constants for sanity check during test run
+    eprintln!("--- Test: test_get_base_cell_for_specific_failing_h3index ---");
+    eprintln!("H3_BC_MASK:   0x{:016x}", H3_BC_MASK);
+    eprintln!("H3_BC_OFFSET: {}", H3_BC_OFFSET);
+    eprintln!("Input H3Index (h.0): 0x{:016x}", h_origin.0);
+
+    let h_shifted_for_mask = h_origin.0 & H3_BC_MASK;
+    eprintln!("h.0 & H3_BC_MASK:    0x{:016x}", h_shifted_for_mask);
+
+    let base_cell_val_before_cast = (h_origin.0 & H3_BC_MASK) >> H3_BC_OFFSET;
+    eprintln!(
+      "(h.0 & H3_BC_MASK) >> H3_BC_OFFSET: {} (0x{:x})",
+      base_cell_val_before_cast, base_cell_val_before_cast
+    );
+
+    let actual_base_cell = get_base_cell(h_origin);
+    eprintln!("get_base_cell(0x{:x}) produced: {}", h_origin.0, actual_base_cell);
+
+    assert_eq!(
+      actual_base_cell, expected_base_cell,
+      "get_base_cell for 0x855943cbfffffff did not return the calculated base cell."
+    );
+  }
+
+  #[test]
+  fn test_get_base_cell_with_known_valid_h3() {
+    let h_known_valid = H3Index(0x085143473fffffff); // Res 5, BC 20
+    let expected_base_cell = 10;
+
+    eprintln!("--- Test: test_get_base_cell_with_known_valid_h3 ---");
+    eprintln!("H3_BC_MASK:   0x{:016x}", H3_BC_MASK);
+    eprintln!("H3_BC_OFFSET: {}", H3_BC_OFFSET);
+    eprintln!("Input H3Index (h.0): 0x{:016x}", h_known_valid.0);
+
+    let h_masked_for_bc = h_known_valid.0 & H3_BC_MASK;
+    eprintln!("h.0 & H3_BC_MASK:    0x{:016x}", h_masked_for_bc);
+    // Expected: 0x085143473fffffff & 0x00FE000000000000 = 0x0014000000000000
+
+    let base_cell_val_before_cast = (h_known_valid.0 & H3_BC_MASK) >> H3_BC_OFFSET;
+    eprintln!(
+      "(h.0 & H3_BC_MASK) >> H3_BC_OFFSET: {} (0x{:x})",
+      base_cell_val_before_cast, base_cell_val_before_cast
+    );
+
+    let actual_base_cell = get_base_cell(h_known_valid);
+    eprintln!("get_base_cell(0x{:x}) produced: {}", h_known_valid.0, actual_base_cell);
+
+    assert_eq!(actual_base_cell, expected_base_cell, "get_base_cell for H3Index(0x085143473fffffff) did not return its bitwise calculated base cell.");
+  }
 }

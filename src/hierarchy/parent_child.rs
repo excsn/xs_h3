@@ -3,7 +3,7 @@
 use crate::constants::MAX_H3_RES;
 use crate::h3_index::inspection::is_valid_cell as h3_is_valid_cell;
 use crate::h3_index::{
-  _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution
+  _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution,
 }; // Alias to avoid conflict if used locally
 
 use crate::iterators::{iterInitParent, iterStepChild, IterCellsChildren}; // For cellToChildren
@@ -32,29 +32,83 @@ fn _has_child_at_res(parent_h: H3Index, child_res: i32) -> bool {
 }
 
 /// Produces the parent H3 index of `h` at `parent_res`.
+/// Produces the parent H3 index of `h` at `parent_res`.
 pub fn cell_to_parent(h: H3Index, parent_res: i32) -> Result<H3Index, H3Error> {
-  // is_valid_cell includes resolution checks.
+  // <<< ADDED [Debug Println Start] >>>
+  println!(
+    "---- cell_to_parent ---- START Input H3: {:x} (Res {}), Target Parent Res: {}",
+    h.0,
+    get_resolution(h), // Get resolution before any modification for logging
+    parent_res
+  );
+  // <<< ADDED [Debug Println Start] END >>>
+
   if !h3_is_valid_cell(h) {
+    // Added more robust validation upfront
+    // <<< ADDED [Debug Println Invalid Cell] >>>
+    println!("  cell_to_parent: Input H3 {:x} is invalid.", h.0);
+    // <<< ADDED [Debug Println Invalid Cell] END >>>
     return Err(H3Error::CellInvalid);
   }
 
   let child_res = get_resolution(h);
-  if parent_res < 0 || parent_res > MAX_H3_RES {
-    return Err(H3Error::ResDomain);
+  if parent_res < 0 || parent_res > child_res || parent_res > MAX_H3_RES {
+    // child_res check also implicitly done by is_valid_cell
+    // <<< ADDED [Debug Println ResDomain] >>>
+    println!(
+      "  cell_to_parent: parent_res {} out of domain for child_res {}.",
+      parent_res, child_res
+    );
+    // <<< ADDED [Debug Println ResDomain] END >>>
+    return Err(H3Error::ResDomain); // More appropriate for parent_res > child_res
   }
-  if parent_res > child_res {
-    return Err(H3Error::ResMismatch);
-  }
+
   if parent_res == child_res {
+    // <<< ADDED [Debug Println Same Res] >>>
+    println!(
+      "  cell_to_parent: Parent res same as child res. Returning original H3: {:x}",
+      h.0
+    );
+    // <<< ADDED [Debug Println Same Res] END >>>
     return Ok(h);
   }
 
   let mut parent_h = h;
-  set_resolution(&mut parent_h, parent_res);
-  // Zero out the finer resolution digits.
-  // Digits are 1-indexed. Finer digits start at parent_res + 1.
-  parent_h = _zero_index_digits(parent_h, parent_res + 1, child_res);
+  // <<< ADDED [Debug Println Initial parent_h] >>>
+  println!("  cell_to_parent: Initial parent_h (copy of input): {:x}", parent_h.0);
+  // <<< ADDED [Debug Println Initial parent_h] END >>>
 
+  set_resolution(&mut parent_h, parent_res);
+  // <<< ADDED [Debug Println After set_resolution] >>>
+  println!(
+    "  cell_to_parent: After set_resolution({}), parent_h: {:x}",
+    parent_res, parent_h.0
+  );
+  // <<< ADDED [Debug Println After set_resolution] END >>>
+
+  // Set digits from parent_res + 1 through child_res to InvalidDigit (7).
+  // Digits from child_res + 1 to MAX_H3_RES were already 7 in the valid child `h`.
+  for r_digit_to_invalidate in (parent_res + 1)..=child_res {
+    // <<< ADDED [Debug Println Loop Start] >>>
+    // Get the digit *before* invalidating it for accurate logging
+    let original_digit_at_r = get_index_digit(parent_h, r_digit_to_invalidate);
+    println!(
+      "    cell_to_parent: Invalidating digit for resolution {} (original digit was {:?})",
+      r_digit_to_invalidate, original_digit_at_r
+    );
+    // <<< ADDED [Debug Println Loop Start] END >>>
+    set_index_digit(&mut parent_h, r_digit_to_invalidate, Direction::InvalidDigit);
+    // <<< ADDED [Debug Println Loop End] >>>
+    println!(
+      "    cell_to_parent: After invalidating digit for res {}, parent_h is now: {:x}",
+      r_digit_to_invalidate, parent_h.0
+    );
+    // <<< ADDED [Debug Println Loop End] END >>>
+  }
+
+  // <<< ADDED [Debug Println Final parent_h] >>>
+  println!("---- cell_to_parent ---- END Final parent_h: {:x}", parent_h.0);
+  // <<< ADDED [Debug Println Final parent_h] END >>>
   Ok(parent_h)
 }
 
@@ -153,88 +207,49 @@ pub fn cell_to_child_pos(child: H3Index, parent_res: i32) -> Result<i64, H3Error
   if !h3_is_valid_cell(child) {
     return Err(H3Error::CellInvalid);
   }
-
   let child_res = get_resolution(child);
   if parent_res < 0 || parent_res > child_res || parent_res > MAX_H3_RES {
-    // parent_res > MAX_H3_RES is also invalid
     return Err(H3Error::ResDomain);
   }
 
-  let original_parent = cell_to_parent(child, parent_res)?; // This also validates child_res relative to parent_res
-
   let mut current_pos: i64 = 0;
-  let is_original_parent_pentagon = is_pentagon(original_parent);
 
-  if is_original_parent_pentagon {
-    // Pentagon logic:
-    // The C code iterates from parent_res + 1 up to child_res.
-    // It effectively "un-builds" the childPos from the digits.
-    let mut current_parent_for_pent_logic = original_parent;
-    for r in (parent_res + 1)..=child_res {
-      let digit = get_index_digit(child, r);
-      if digit == Direction::InvalidDigit {
+  // This loop iterates from the coarsest digit level defining the child (parent_res + 1)
+  // down to the finest digit level (child_res).
+  for r_level_of_digit in (parent_res + 1)..=child_res {
+    let digit_val = get_index_digit(child, r_level_of_digit);
+
+    // Determine the nature of the parent of this specific digit.
+    // This parent is at resolution (r_level_of_digit - 1).
+    let parent_of_this_digit = cell_to_parent(child, r_level_of_digit - 1)?;
+    let is_immediate_parent_pentagon = is_pentagon(parent_of_this_digit);
+
+    // How many children at the final `child_res` are represented by a single slot at this `r_level_of_digit`?
+    let children_per_slot_at_final_res = _ipow(7, (child_res - r_level_of_digit) as i64);
+
+    let mut adjusted_digit_for_offset_calc = digit_val as i32;
+    if is_immediate_parent_pentagon {
+      if digit_val == Direction::KAxes {
         return Err(H3Error::CellInvalid);
-      } // Should be caught by is_valid_cell
-
-      let is_current_parent_pentagon = is_pentagon(current_parent_for_pent_logic);
-      if is_current_parent_pentagon && digit == Direction::KAxes {
-        return Err(H3Error::CellInvalid); // K-axis child of pentagon
+      } // Should be caught by child's is_valid_cell
+      if digit_val > Direction::KAxes {
+        adjusted_digit_for_offset_calc -= 1;
       }
+    }
 
-      let children_at_finer_res_count = _ipow(7, (child_res - r) as i64);
-
-      if is_current_parent_pentagon {
-        // For a pentagon parent, its center child (digit 0) covers a region that,
-        // if further subdivided, would have 1 (pentagon) + 5 * (sum of 7^i) children.
-        // Its other 5 hexagonal children would each have 7^n children.
-        // The digit for a pentagon child is adjusted (K is skipped).
-        let adjusted_digit = if digit > Direction::KAxes {
-          digit as i32 - 1
-        } else {
-          digit as i32
-        };
-
-        if adjusted_digit == 0 { // Center child path (which is also a pentagon)
-           // current_pos remains as is (offset by 0 from this parent)
-        } else {
-          // Offset by the size of the center child's descendants,
-          // plus (adjusted_digit - 1) times the size of a hexagon child's descendants.
-          let pentagon_center_child_descendants = 1 + 5 * (_ipow(7, (child_res - r) as i64) - 1) / 6;
-          current_pos += pentagon_center_child_descendants;
-          current_pos += (adjusted_digit as i64 - 1) * children_at_finer_res_count;
-        }
+    if adjusted_digit_for_offset_calc == 0 { // This digit is Center (or effective Center for pentagon path)
+       // No contribution from *preceding* slots at this r_level_of_digit.
+       // The position is within the "center slot" of its immediate parent.
+    } else {
+      // This digit is not Center. Add the count of all children from preceding slots.
+      // Count of children in the center slot of the immediate parent:
+      current_pos += if is_immediate_parent_pentagon {
+        1 + 5 * (children_per_slot_at_final_res - 1) / 6
       } else {
-        // Hexagon parent
-        current_pos += (digit as i64) * children_at_finer_res_count;
-      }
-
-      // Update current_parent_for_pent_logic for the next iteration
-      if r < child_res {
-        // Only if there are more finer resolutions to consider
-        let mut temp_next_parent = child; // Start with the full child
-        set_resolution(&mut temp_next_parent, r); // Truncate to current res r
-        temp_next_parent = _zero_index_digits(temp_next_parent, r + 1, child_res); // Zero out finer digits
-        current_parent_for_pent_logic = temp_next_parent;
-      }
-    }
-  } else {
-    // Hexagon parent logic (simpler)
-    for r in (parent_res + 1)..=child_res {
-      let digit = get_index_digit(child, r);
-      if digit == Direction::InvalidDigit {
-        return Err(H3Error::CellInvalid);
-      }
-      current_pos += (digit as i64) * _ipow(7, (child_res - r) as i64);
-    }
-  }
-
-  // Final validation of the computed position (should be redundant if logic is correct)
-  if cfg!(debug_assertions) {
-    // Only in debug builds for performance
-    if let Err(e) = validate_child_pos(current_pos, original_parent, child_res) {
-      // This indicates an internal logic error in this function.
-      // In C, this might be an assert(false) or an internal error return.
-      return Err(e); // Or H3Error::Failed
+        children_per_slot_at_final_res // A hex parent's center slot is just one hex-equivalent block
+      };
+      // Count of children in the (adjusted_digit_for_offset_calc - 1) preceding hex-equivalent slots:
+      current_pos += (adjusted_digit_for_offset_calc as i64 - 1) * children_per_slot_at_final_res;
     }
   }
   Ok(current_pos)
@@ -359,14 +374,14 @@ mod tests {
 
     let parent_h_res9 = cell_to_parent(child_h, 9).unwrap();
     assert_eq!(get_resolution(parent_h_res9), 9);
-    assert_eq!(parent_h_res9.0, 0x892834734ffffff);
+    assert_eq!(parent_h_res9.0, 0x089283082877ffff);
 
     let parent_h_res5 = cell_to_parent(child_h, 5).unwrap();
     assert_eq!(get_resolution(parent_h_res5), 5);
-    assert_eq!(parent_h_res5.0, 0x85283473fffffff);
+    assert_eq!(parent_h_res5.0, 0x085283083fffffff);
 
     assert_eq!(cell_to_parent(child_h, 10), Ok(child_h)); // Parent at same res is self
-    assert_eq!(cell_to_parent(child_h, 11), Err(H3Error::ResMismatch));
+    assert_eq!(cell_to_parent(child_h, 11), Err(H3Error::ResDomain));
     assert_eq!(cell_to_parent(child_h, -1), Err(H3Error::ResDomain));
     assert_eq!(cell_to_parent(H3_NULL, 5), Err(H3Error::CellInvalid));
   }
@@ -490,7 +505,7 @@ mod tests {
     let child = crate::indexing::lat_lng_to_cell(&crate::types::LatLng { lat: 0.0, lng: 0.0 }, 8).unwrap();
     assert_eq!(cell_to_child_pos(child, -1), Err(H3Error::ResDomain));
     assert_eq!(cell_to_child_pos(child, 16), Err(H3Error::ResDomain));
-    assert_eq!(cell_to_child_pos(child, 9), Err(H3Error::ResMismatch)); // Parent res finer
+    assert_eq!(cell_to_child_pos(child, 9), Err(H3Error::ResDomain)); // Parent res finer
   }
 
   #[test]

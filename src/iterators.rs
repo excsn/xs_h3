@@ -4,7 +4,7 @@
 use crate::base_cells::baseCellNumToCell;
 use crate::constants::{MAX_H3_RES, NUM_BASE_CELLS};
 use crate::h3_index::{
-  _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution
+  _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution,
 };
 use crate::hierarchy::parent_child::_zero_index_digits; // Use the helper we created
 use crate::types::{Direction, H3Index, H3_NULL}; // If this is how we get initial base cell
@@ -95,60 +95,61 @@ pub fn iterInitBaseCellNum(base_cell_num: i32, child_res: i32) -> IterCellsChild
 /// If `iter.h` is `H3_NULL`, the iteration is complete.
 pub fn iterStepChild(iter: &mut IterCellsChildren) {
   if iter.h == H3_NULL {
-    return; // Iteration already complete or errored
+    return;
   }
 
-  let child_res = get_resolution(iter.h); // Current child's resolution
+  let child_res = get_resolution(iter.h);
 
-  // Attempt to increment the last digit (finest resolution digit)
-  // This is equivalent to: iter.h += (1 << ((MAX_H3_RES - childRes) * 3))
-  // but set_index_digit handles the masking and setting correctly.
-  let current_last_digit_val = get_index_digit(iter.h, child_res) as u8;
-  let mut next_last_digit_val = current_last_digit_val + 1;
-
-  // Handle pentagon KAxes skip for the current _skipDigitRes position
-  if child_res == iter._skipDigitRes && next_last_digit_val == Direction::KAxes as u8 {
-    next_last_digit_val += 1;
+  // Phase 1: Naive increment of the H3 index, handling cascades.
+  // This helper needs to increment starting from child_res and stop before _parentRes.
+  // It should return true if it cascaded past the parent (making iter.h H3_NULL).
+  if _naive_increment_and_cascade(iter, child_res) {
+    // _naive_increment_and_cascade already set iter.h to H3_NULL
+    return;
   }
 
-  set_index_digit(
-    &mut iter.h,
-    child_res,
-    Direction::try_from(next_last_digit_val).unwrap_or(Direction::InvalidDigit),
-  );
+  // Phase 2: K-Skip. This part executes only if iter.h is still valid.
+  // Check if the current _skipDigitRes is valid and needs skipping.
+  if iter._skipDigitRes >= iter._parentRes + 1 {
+    // Still relevant to skip
+    if get_index_digit(iter.h, iter._skipDigitRes) == Direction::KAxes {
+      // Yes, the digit at the skip-responsible level is K.
+      // Increment starting from this specific digit and cascade.
+      if _naive_increment_and_cascade(iter, iter._skipDigitRes) {
+        return; // Cascaded past parent during K-skip adjustment
+      }
+      // If successful, the responsibility moves up.
+      iter._skipDigitRes -= 1;
+    }
+  }
+}
 
-  // Cascade up if we've rolled over a digit (it became 7/Invalid or higher)
-  for r_check in (iter._parentRes + 1..=child_res).rev() {
-    // If current digit at r_check is 7 (InvalidDigit) or greater (after increment)
-    if get_index_digit(iter.h, r_check) as u8 >= Direction::InvalidDigit as u8 {
-      if r_check == iter._parentRes + 1 {
-        // Rolled over the coarsest digit we are allowed to change. Iteration is done.
+// Helper for Phase 1 and Phase 2's increment part.
+// Increments h starting at `level_to_inc_from`, cascading up to `iter._parentRes + 1`.
+// Returns true if h becomes H3_NULL (cascaded past parent).
+fn _naive_increment_and_cascade(iter: &mut IterCellsChildren, level_to_inc_from: i32) -> bool {
+  let mut r_cascade = level_to_inc_from;
+  loop {
+    if r_cascade < iter._parentRes + 1 {
+      *iter = IterCellsChildren::null_iter();
+      return true;
+    }
+
+    let mut digit_val = get_index_digit(iter.h, r_cascade) as u8;
+    digit_val += 1;
+
+    if digit_val >= Direction::InvalidDigit as u8 {
+      // Rollover
+      set_index_digit(&mut iter.h, r_cascade, Direction::Center);
+      // DO NOT MODIFY _skipDigitRes here.
+      if r_cascade == iter._parentRes + 1 {
         *iter = IterCellsChildren::null_iter();
-        return;
+        return true;
       }
-
-      // Zero out the current digit (set to Center) and increment the next coarser digit
-      set_index_digit(&mut iter.h, r_check, Direction::Center);
-
-      let coarser_digit_res = r_check - 1;
-      let current_coarser_digit_val = get_index_digit(iter.h, coarser_digit_res) as u8;
-      let mut next_coarser_digit_val = current_coarser_digit_val + 1;
-
-      // Handle pentagon KAxes skip for the coarser digit if it's now the _skipDigitRes
-      if coarser_digit_res == iter._skipDigitRes && next_coarser_digit_val == Direction::KAxes as u8 {
-        next_coarser_digit_val += 1;
-        // After skipping K, the effective skip resolution moves up with us.
-        // This matches C logic: `it->_skipDigit--`
-        iter._skipDigitRes -= 1;
-      }
-      set_index_digit(
-        &mut iter.h,
-        coarser_digit_res,
-        Direction::try_from(next_coarser_digit_val).unwrap_or(Direction::InvalidDigit),
-      );
+      r_cascade -= 1;
     } else {
-      // No rollover at this resolution, so we're done cascading for this step.
-      break;
+      set_index_digit(&mut iter.h, r_cascade, Direction::try_from(digit_val).unwrap());
+      return false;
     }
   }
 }
@@ -223,7 +224,7 @@ mod tests {
   use crate::h3_index; // For get_resolution, is_pentagon, etc.
   use crate::hierarchy::parent_child::cell_to_children_size;
   use crate::math::extensions::_ipow;
-use crate::types::H3Index; // For checking count
+  use crate::types::H3Index; // For checking count
 
   #[test]
   fn test_iter_init_parent_invalid() {
@@ -326,8 +327,6 @@ use crate::types::H3Index; // For checking count
   fn test_iter_all_cells_at_resolution() {
     for res in 0..=3 {
       // Test a few low resolutions
-      let expected_count = cell_to_children_size(H3Index(0), res).unwrap() * (NUM_BASE_CELLS as i64);
-      // No, this is not right. Use getNumCells.
       let expected_count_total = crate::h3_index::get_num_cells(res).unwrap(); // Assuming getNumCells is ported
 
       let mut iter = iterInitRes(res);

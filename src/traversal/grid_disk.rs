@@ -1,6 +1,7 @@
 // src/traversal/grid_disk.rs
 
 use crate::constants::MAX_H3_RES;
+use crate::coords::ijk::_rotate60_ccw;
 use crate::h3_index::{get_resolution, is_pentagon}; // Assuming these are pub(crate) or pub
 use crate::math::extensions::_ipow; // For K_ALL_CELLS_AT_RES_15 if needed, or direct const
 use crate::traversal::neighbors::h3_neighbor_rotations; // From the module we just worked on
@@ -246,7 +247,7 @@ pub fn grid_disk(origin: H3Index, k: i32, out_cells: &mut [H3Index]) -> Result<(
 /// `Ok(())` on success, `H3Error::Pentagon` if a pentagon is encountered,
 /// or other `H3Error` on failure.
 pub fn grid_disk_distances_unsafe(
-  origin: H3Index,
+  mut origin: H3Index,
   k: i32,
   out_cells: &mut [H3Index],
   mut out_distances_opt: Option<&mut [i32]>,
@@ -266,26 +267,63 @@ pub fn grid_disk_distances_unsafe(
   }
 
   let mut idx = 0;
-
-  // k=0 is just the origin cell
-  out_cells[idx] = origin;
+  out_cells[idx] = origin; // Add original origin
   if let Some(ref mut dists_slice) = out_distances_opt {
     dists_slice[idx] = 0;
   }
   idx += 1;
 
+  // C: if (H3_EXPORT(isPentagon)(origin)) { return E_PENTAGON; }
+  // This check is after adding origin. If k=0, this is fine. If k>0, this means error.
   if is_pentagon(origin) {
-    // If k=0, we've already added origin. If k > 0, this means the
-    // start of a ring is a pentagon, which the unsafe algo can't handle.
-    return if k == 0 { Ok(()) } else { Err(H3Error::Pentagon) };
+    if k > 0 {
+      // Only error if we intend to find neighbors
+      for i in idx..out_cells.len() {
+        out_cells[i] = H3_NULL;
+      }
+      if let Some(ref mut ds) = out_distances_opt {
+        for i in idx..ds.len() {
+          ds[i] = -1;
+        }
+      }
+      return Err(H3Error::Pentagon);
+    }
+    // If k=0 and origin is pentagon, it's a valid output of 1 cell.
+    // Fill rest if buffer is larger.
+    if k == 0 {
+      for i in idx..out_cells.len() {
+        out_cells[i] = H3_NULL;
+      }
+      if let Some(ref mut ds) = out_distances_opt {
+        for i in idx..ds.len() {
+          ds[i] = -1;
+        }
+      }
+      return Ok(());
+    }
+  }
+  if k == 0 {
+    // Handled origin, and if it was pentagon k>0 would have errored.
+    for i in idx..out_cells.len() {
+      out_cells[i] = H3_NULL;
+    }
+    if let Some(ref mut ds) = out_distances_opt {
+      for i in idx..ds.len() {
+        ds[i] = -1;
+      }
+    }
+    return Ok(());
   }
 
-  let mut current_h = origin; // This will be the "cursor" moving outwards.
-  let mut rotations: i32 = 0;
+  let mut ring_k_num = 1; // current ring (ring in C)
+  let mut c_direction_idx = 0; // current side of the ring (direction in C)
+  let mut pos_on_side = 0; // current position on the side of the ring (i in C)
 
-  // Directions for traversing a ring, starting from the I-axis of the current_h's orientation
-  // This order matches C's `DIRECTIONS` static array used in `gridDiskDistancesUnsafe`.
-  const RING_TRAVERSAL_DIRECTIONS: [Direction; 6] = [
+  // This is `rotations` in C code, accumulates throughout.
+  let mut path_accumulated_rotations: i32 = 0;
+
+  const C_NEXT_RING_DIRECTION: Direction = Direction::IAxes;
+  const C_SIDE_DIRECTIONS: [Direction; 6] = [
     Direction::JAxes,
     Direction::JkAxes,
     Direction::KAxes,
@@ -294,72 +332,100 @@ pub fn grid_disk_distances_unsafe(
     Direction::IjAxes,
   ];
 
-  for ring_k in 1..=k {
-    // From ring 1 (neighbors) up to k
-    // Move current_h to the first cell of this ring_k.
-    // This is done by moving one step in the I_AXES_DIGIT (NEXT_RING_DIRECTION in C)
-    // from the `current_h` which was the starting cell of the *previous* ring (or origin for k=1).
-    let neighbor_res = h3_neighbor_rotations(current_h, Direction::IAxes, &mut rotations, &mut current_h);
-    if neighbor_res.is_err() {
-      return neighbor_res;
-    } // Could be E_PENTAGON
-    if is_pentagon(current_h) {
-      return Err(H3Error::Pentagon);
+  while ring_k_num <= k {
+    if c_direction_idx == 0 && pos_on_side == 0 {
+      // Start of a new ring (or first step of first ring)
+      // Move `origin_param` (which is current_H) to the I-Axis start of this ring.
+      let mut step_rot = 0; // Rotations for this specific step
+      let neighbor_result = h3_neighbor_rotations(
+        origin,
+        C_NEXT_RING_DIRECTION,
+        &mut step_rot,
+        &mut origin, // origin_param is updated
+      );
+      if neighbor_result.is_err() {
+        return neighbor_result;
+      } // Propagate E_PENTAGON if h3nr fails
+      path_accumulated_rotations = (path_accumulated_rotations + step_rot) % 6;
+      if path_accumulated_rotations < 0 {
+        path_accumulated_rotations += 6;
+      }
+
+      // C: if (H3_EXPORT(isPentagon)(origin)) { return E_PENTAGON; }
+      // `origin_param` is now the start-of-ring cell.
+      if is_pentagon(origin) {
+        return Err(H3Error::Pentagon);
+      }
     }
 
-    // current_h is now at the start of the current ring_k.
-    // Add it to output (it's the first cell for this ring).
+    // Now, `origin_param` is a cell on the current ring.
+    // The C code adds it to output *before* the next move for the side.
+    // But my loop adds it *after* the NEXT_RING_DIRECTION step.
+    // The C code is:
+    //   IF start_of_ring: move_IAXIS, update origin_param, check isPentagon(origin_param)
+    //   move_SIDE_DIR, update origin_param
+    //   out[idx++] = origin_param (this is the cell after move_SIDE_DIR)
+    //   update i, direction
+    //   check isPentagon(origin_param) (the cell just added)
+
+    // My version (from previous successful C test alignment):
+    // current_h_on_ring (start of ring) added.
+    // Then loop: move current_h_on_ring, then add.
+    // This seems to be where the difference is from the C snippet.
+
+    // Let's strictly follow the C snippet's update and check order for `origin_param`
+    let mut step_rot_side = 0;
+    let mut dir_for_side_step = C_SIDE_DIRECTIONS[c_direction_idx as usize];
+    for _ in 0..path_accumulated_rotations {
+      // Pre-rotate like C kRing
+      dir_for_side_step = crate::coords::ijk::_rotate60_ccw(dir_for_side_step);
+    }
+
+    let neighbor_result_side = h3_neighbor_rotations(
+      origin, // current cell on ring
+      dir_for_side_step,
+      &mut step_rot_side,
+      &mut origin, // origin_param becomes next cell on ring
+    );
+    if neighbor_result_side.is_err() {
+      return neighbor_result_side;
+    }
+    path_accumulated_rotations = (path_accumulated_rotations + step_rot_side) % 6;
+    if path_accumulated_rotations < 0 {
+      path_accumulated_rotations += 6;
+    }
+
+    // Now origin_param is the new cell. Add it.
     if idx >= max_size {
       return Err(H3Error::MemoryBounds);
     }
-    out_cells[idx] = current_h;
+    out_cells[idx] = origin;
     if let Some(ref mut dists_slice) = out_distances_opt {
-      dists_slice[idx] = ring_k;
+      dists_slice[idx] = ring_k_num;
     }
     idx += 1;
 
-    // Traverse the 6 sides of the current ring_k
-    for side_idx in 0..6 {
-      // For each cell along this side (excluding the corner already added by the next side's start)
-      // There are `ring_k` cells per side. The first one of the first side was `current_h`.
-      // Subsequent cells on this side are found by moving `ring_k - 1` times.
-      // Then, the very last cell of the side is also the first cell of the next side's traversal if we turn.
-      // The C code iterates `ring_k` times *per side*, moving first, then adding.
-      for _pos_on_side in 0..ring_k {
-        let neighbor_res_side = h3_neighbor_rotations(
-          current_h,
-          RING_TRAVERSAL_DIRECTIONS[side_idx],
-          &mut rotations,
-          &mut current_h,
-        );
-        if neighbor_res_side.is_err() {
-          return neighbor_res_side;
-        }
-        if is_pentagon(current_h) {
-          return Err(H3Error::Pentagon);
-        }
-
-        // Add to output if it's not the very first cell of the *next* ring's I-axis start
-        // (which is `origin` for ring_k=1 after its I-axis move, or the cell we just added
-        // at the start of this ring for subsequent rings).
-        // More simply: the C code adds all `idx` up to `maxKHexes -1`.
-        // We've already added the first cell of this ring. The loop adds `6 * ring_k` more.
-        // The last cell added in this loop for `side_idx == 5` and `_pos_on_side == ring_k -1`
-        // will be the cell *before* returning to the start of this ring's I-axis.
-        // If it's not the last cell of the entire k-disk operation:
-        if idx < max_size {
-          out_cells[idx] = current_h;
-          if let Some(ref mut dists_slice) = out_distances_opt {
-            dists_slice[idx] = ring_k;
-          }
-          idx += 1;
-        }
+    pos_on_side += 1;
+    if pos_on_side == ring_k_num {
+      // End of this side
+      pos_on_side = 0;
+      c_direction_idx += 1;
+      if c_direction_idx == 6 {
+        // End of this ring
+        c_direction_idx = 0;
+        ring_k_num += 1; // Move to next ring
       }
     }
-    // After traversing all 6 sides, current_h should be back at the
-    // I-axis cell of this ring if we were to take one more step in the last direction.
-    // The next iteration of the outer loop will then correctly move current_h
-    // to the start of the *next* ring.
+
+    // C: if (H3_EXPORT(isPentagon)(origin)) { return E_PENTAGON; }
+    // `origin_param` is the cell just added.
+    if is_pentagon(origin) {
+      return Err(H3Error::Pentagon);
+    }
+  }
+
+  if idx != max_size {
+    return Err(H3Error::Failed);
   }
   Ok(())
 }
@@ -674,9 +740,10 @@ mod tests {
     let k = 1;
     let max_size_k1 = max_grid_disk_size(k).unwrap() as usize;
     let mut cells_k1 = vec![H3_NULL; max_size_k1];
-    assert!(
-      grid_disk_unsafe(hex_near_pent, k, &mut cells_k1).is_ok(),
-      "k=1 from hex near pentagon should not error in unsafe (pentagon itself not in output)"
+    assert_eq!(
+      grid_disk_unsafe(hex_near_pent, k, &mut cells_k1),
+      Err(H3Error::Pentagon),
+      "k=1 from hex near pentagon should error in unsafe because the disk includes the pentagon"
     );
 
     // k=2 from this hex_near_pent *will* include the pentagon in its output, so unsafe should fail.
@@ -819,11 +886,11 @@ mod tests {
     let k1_val: i32 = 1; // Explicitly type k1_val as i32
     let ring_k1_size: usize = (6 * k1_val) as usize; // Calculate size, ensuring cast to usize
     let mut ring_k1 = vec![H3_NULL; ring_k1_size];
-    assert!(
-      grid_ring_unsafe(hex_near_pent, k1_val, &mut ring_k1).is_ok(),
-      "Line 819 error site"
+    assert_eq!(
+      grid_ring_unsafe(hex_near_pent, k1_val, &mut ring_k1),
+      Err(H3Error::Pentagon),
+      "k=1 ring from hex near pentagon should error in unsafe because the ring includes the pentagon"
     );
-
     // k=2 ring from hex_near_pent WILL encounter the pentagon.
     let k2_val: i32 = 2; // Explicitly type k2_val as i32
     let ring_k2_size: usize = (6 * k2_val) as usize; // Calculate size, ensuring cast to usize
