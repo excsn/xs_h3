@@ -1,5 +1,3 @@
-// src/latlng.rs
-
 use crate::bbox::LongitudeNormalization;
 use crate::constants::{EARTH_RADIUS_KM, EPSILON_RAD, MAX_H3_RES, M_180_PI, M_2PI, M_PI, M_PI_180, M_PI_2};
 use crate::types::LatLng;

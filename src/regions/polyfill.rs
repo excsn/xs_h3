@@ -1,22 +1,20 @@
-use crate::base_cells::{_is_base_cell_pentagon, baseCellNumToCell};
+use crate::base_cells::baseCellNumToCell;
 use crate::bbox::{bbox_contains_bbox, bbox_overlaps_bbox, bbox_to_cell_boundary, bboxes_from_geo_polygon};
 use crate::constants::{
-  CELL_SCALE_FACTOR, CHILD_SCALE_FACTOR, EPSILON, EPSILON_RAD, MAX_CELL_BNDRY_VERTS, MAX_EDGE_LENGTH_RADS, MAX_H3_RES,
-  M_PI, M_PI_2, NORTH_POLE_CELLS, NUM_BASE_CELLS, RES0_BBOXES, SOUTH_POLE_CELLS, VALID_RANGE_BBOX,
+  CELL_SCALE_FACTOR, CHILD_SCALE_FACTOR, EPSILON, MAX_EDGE_LENGTH_RADS, MAX_H3_RES,
+  M_PI, M_PI_2, NORTH_POLE_CELLS, NUM_BASE_CELLS, RES0_BBOXES, SOUTH_POLE_CELLS,
 };
-use crate::coords::face_ijk::{Overage, _face_ijk_pent_to_cell_boundary, _face_ijk_to_cell_boundary}; // Overage might not be needed here directly
-use crate::h3_index::inspection::is_valid_cell as h3_is_valid_cell; // Alias for clarity
 use crate::h3_index::{
-  _h3_to_face_ijk, get_base_cell, get_index_digit, get_mode, get_resolution, is_pentagon, set_index_digit,
+  get_base_cell, get_index_digit, get_resolution, is_pentagon, set_index_digit,
   set_resolution,
 };
 use crate::hierarchy::parent_child::{cell_to_center_child, cell_to_children_size};
-use crate::iterators::{iterInitParent, iterStepChild, IterCellsChildren};
+use crate::iterators::{iter_init_parent, iter_step_child, IterCellsChildren};
 use crate::polygon::{
-  cell_boundary_crosses_polygon, cell_boundary_inside_polygon, flag_get_containment_mode, point_inside_polygon,
+  cell_boundary_crosses_polygon, cell_boundary_inside_polygon, point_inside_polygon,
   validate_polygon_flags,
 };
-use crate::types::{BBox, CellBoundary, ContainmentMode, GeoPolygon, H3Error, H3Index, LatLng, H3_NULL};
+use crate::types::{BBox, ContainmentMode, GeoPolygon, H3Error, H3Index, LatLng, H3_NULL};
 use std::ptr;
 
 /// Internal helper: Given a cell, find the next cell in the sequence of all cells
@@ -174,7 +172,7 @@ impl IterCellsPolygonCompact {
         let mut should_output = false;
         match mode {
           ContainmentMode::Center | ContainmentMode::Overlapping | ContainmentMode::OverlappingBbox => {
-            let mut center = LatLng::default();
+            
             match crate::indexing::cell_to_lat_lng(current_cell_iter) {
               Ok(center_val) => {
                 // center_val is the LatLng
@@ -319,7 +317,7 @@ impl IterCellsPolygon {
   /// Initializes the iterator.
   pub fn new(polygon: &GeoPolygon, res: i32, flags: u32) -> Self {
     let cell_iter = IterCellsPolygonCompact::_new(polygon, res, flags); // Use internal init
-    let mut child_iter = iterInitParent(cell_iter.cell, res); // iterInitParent handles H3_NULL for cell_iter.cell
+    let mut child_iter = iter_init_parent(cell_iter.cell, res); // iterInitParent handles H3_NULL for cell_iter.cell
 
     let initial_cell;
     if cell_iter.error == H3Error::Success {
@@ -354,7 +352,7 @@ impl IterCellsPolygon {
 
     // Try to step the child iterator first
     if self._child_iter.h != H3_NULL {
-      iterStepChild(&mut self._child_iter);
+      iter_step_child(&mut self._child_iter);
       if self._child_iter.h != H3_NULL {
         self.cell = self._child_iter.h;
         return;
@@ -365,7 +363,7 @@ impl IterCellsPolygon {
     self._cell_iter.step();
     if self._cell_iter.cell != H3_NULL {
       // Initialize new child iterator for the new compact cell
-      self._child_iter = iterInitParent(self._cell_iter.cell, self._cell_iter._res);
+      self._child_iter = iter_init_parent(self._cell_iter.cell, self._cell_iter._res);
 
       // If the compact cell itself is at target res, it's the next value.
       // Otherwise, the first child from the new child_iter is.

@@ -1,5 +1,3 @@
-// src/indexing/from_h3.rs
-
 use crate::coords::face_ijk::{_face_ijk_pent_to_cell_boundary, _face_ijk_to_cell_boundary, _face_ijk_to_geo};
 use crate::h3_index::inspection::{is_pentagon, is_valid_cell};
 use crate::h3_index::{_h3_to_face_ijk, get_resolution};

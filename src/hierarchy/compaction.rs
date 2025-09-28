@@ -1,8 +1,7 @@
-use crate::constants::{H3_RESERVED_MASK_NEGATIVE, MAX_H3_RES};
+use crate::constants::MAX_H3_RES;
 use crate::h3_index::inspection::is_valid_cell as h3_is_valid_cell;
-use crate::h3_index::{get_reserved_bits, get_resolution, is_pentagon, set_reserved_bits};
+use crate::h3_index::{get_resolution, is_pentagon};
 use crate::hierarchy::parent_child::{cell_to_children, cell_to_children_size, cell_to_parent};
-use crate::iterators::{iterInitParent}; // If cell_to_children uses this
 use crate::types::{H3Error, H3Index, H3_NULL};
 
 use std::collections::HashMap; // For a safer compaction approach
@@ -123,7 +122,7 @@ pub fn uncompact_cells(compacted_set: &[H3Index], res: i32, out_set: &mut [H3Ind
 /// `Ok(num_compacted_cells)` which is the number of cells written to `out_compacted_set`,
 /// or an `H3Error` on failure.
 pub fn compact_cells(
-  mut h3_set: &mut [H3Index], // Takes mutable slice for in-place sort & modification
+  h3_set: &mut [H3Index], // Takes mutable slice for in-place sort & modification
   out_compacted_set: &mut [H3Index],
 ) -> Result<usize, H3Error> {
   if h3_set.is_empty() {
@@ -159,7 +158,7 @@ pub fn compact_cells(
   if initial_res == 0 {
     // Nothing to compact at res 0
     let mut count = 0;
-    for (i, &cell) in h3_set.iter().enumerate() {
+    for (_i, &cell) in h3_set.iter().enumerate() {
       if cell != H3_NULL {
         if count >= out_compacted_set.len() {
           return Err(H3Error::MemoryBounds);
@@ -258,14 +257,14 @@ mod tests {
 
   #[test]
   fn test_uncompact_cells_size() {
-    let mut compacted = [H3Index(0x85283473fffffff)]; // Res 5 cell
+    let compacted = [H3Index(0x85283473fffffff)]; // Res 5 cell
     assert_eq!(uncompact_cells_size(&compacted, 5), Ok(1));
     assert_eq!(uncompact_cells_size(&compacted, 6), Ok(7));
     assert_eq!(uncompact_cells_size(&compacted, 7), Ok(49));
     assert_eq!(uncompact_cells_size(&compacted, 4), Err(H3Error::ResMismatch));
     assert_eq!(uncompact_cells_size(&[H3_NULL], 5), Ok(0)); // Skips H3_NULL
 
-    let mut pent_compacted = [crate::h3_index::_face_ijk_to_h3(
+    let pent_compacted = [crate::h3_index::_face_ijk_to_h3(
       &crate::types::FaceIJK {
         face: 0,
         coord: crate::types::CoordIJK { i: 2, j: 0, k: 0 },

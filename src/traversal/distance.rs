@@ -1,9 +1,7 @@
-// src/traversal/distance.rs
-
-use crate::coords::ijk::ijk_distance; // Assuming ijk_distance is pub(crate) in coords::ijk
+use crate::coords::ijk::ijk_distance;
 use crate::h3_index::inspection::is_valid_cell;
 use crate::h3_index::{get_mode, get_resolution};
-use crate::local_ij::cell_to_local_ijk; // Assuming cellToLocalIjk is here and pub(crate)
+use crate::local_ij::cell_to_local_ijk;
 use crate::types::{H3Error, H3Index};
 
 /// Produces the grid distance between the two H3 cells.

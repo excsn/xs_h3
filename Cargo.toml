@@ -1,11 +1,11 @@
 [package]
 name = "xs_h3"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Excerion Sun <dev@excsn.com>"]
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 description = "Excerion Sun's Rust implementation of Uber's H3 geospatial indexing library"
-repository = "https://github.com/excsn/xs_h3" # Replace with your repo
+repository = "https://github.com/excsn/xs_h3"
 readme = "README.md"
 keywords = ["h3", "geospatial", "gis", "index", "uber"]
 categories = ["algorithms", "data-structures", "science::geo"]

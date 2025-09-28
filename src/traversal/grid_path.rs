@@ -1,11 +1,9 @@
 // src/traversal/grid_path.rs
 
-use crate::coords::ijk::{_ijk_normalize, cube_to_ijk, ijk_to_cube}; // Assuming these are pub(crate)
-use crate::h3_index::get_mode;
-use crate::h3_index::inspection::is_valid_cell;
-use crate::local_ij::cell_to_local_ijk; // Assuming cellToLocalIjk is here
-use crate::local_ij::local_ijk_to_cell; // Assuming localIjkToCell is here
-use crate::traversal::distance::grid_distance; // From the distance module
+use crate::coords::ijk::{_ijk_normalize, ijk_to_cube};
+use crate::local_ij::cell_to_local_ijk;
+use crate::local_ij::local_ijk_to_cell;
+use crate::traversal::distance::grid_distance;
 use crate::types::{CoordIJK, H3Error, H3Index};
 
 /// Number of H3 cells in a line from the `start` H3 cell to the `end` H3 cell.
@@ -23,7 +21,7 @@ pub fn grid_path_cells_size(start: H3Index, end: H3Index) -> Result<i64, H3Error
   }
 }
 
-fn lround_c99_style(val: f64) -> f64 {
+fn c99_round(val: f64) -> f64 {
   if val == 0.0 {
     // Handle exact zero to avoid -0.0 issues if any
     0.0
@@ -34,16 +32,13 @@ fn lround_c99_style(val: f64) -> f64 {
     (val - 0.5).ceil()
   }
 }
+
 /// Helper: Rounds cube coordinates to the nearest integer cube coordinate.
 /// Algorithm from https://www.redblobgames.com/grids/hexagons/#rounding
 fn cube_round(i_f: f64, j_f: f64, k_f: f64, out_ijk: &mut CoordIJK) {
-  // let mut ri = i_f.round();
-  // let mut rj = j_f.round();
-  // let mut rk = k_f.round();
-
-  let mut ri = lround_c99_style(i_f);
-  let mut rj = lround_c99_style(j_f);
-  let mut rk = lround_c99_style(k_f);
+  let mut ri = c99_round(i_f);
+  let mut rj = c99_round(j_f);
+  let mut rk = c99_round(k_f);
 
   let i_diff = (ri - i_f).abs();
   let j_diff = (rj - j_f).abs();
@@ -63,48 +58,16 @@ fn cube_round(i_f: f64, j_f: f64, k_f: f64, out_ijk: &mut CoordIJK) {
   out_ijk.k = rk as i32;
 }
 
-fn c99_round(val: f64) -> f64 {
-  if val == 0.0 {
-    // Handle exact zero to avoid -0.0 issues if any
-    0.0
-  } else if val > 0.0 {
-    (val + 0.5).floor()
-  } else {
-    // val < 0.0
-    (val - 0.5).ceil()
-  }
-}
-
 // Helper: Rounds fractional IJK coordinates to the nearest integer IJK hex center.
-// This is different from cube_round. For IJK, we round each component.
+// For IJK, we round each component.
 // Then, we might need to adjust to ensure it's a valid IJK+ for H3 (e.g., sum properties or normalization).
 // H3's internal _ijkRound (used by h3Line) does:
 // i_r = round(i_f); j_r = round(j_f); k_r = round(k_f);
 // i_diff = abs(i_r - i_f); j_diff = abs(j_r - j_f); k_diff = abs(k_r - k_f);
 // Then it adjusts the largest-diff component to make i_r + j_r + k_r = 0 (axial property).
 // This is effectively cube_round if we treat the fractional IJK as fractional cube coords.
-// So, the existing cube_round can be reused here conceptually, as fractional IJK components
-// can be thought of as fractional cube components if their sum is maintained as 0.
 fn ijk_round_to_axial_hex_center(i_f: f64, j_f: f64, k_f: f64, out_ijk: &mut CoordIJK) {
-  let mut ri = lround_c99_style(i_f);
-  let mut rj = lround_c99_style(j_f);
-  let mut rk = lround_c99_style(k_f);
-
-  let i_diff = (ri - i_f).abs();
-  let j_diff = (rj - j_f).abs();
-  let k_diff = (rk - k_f).abs();
-
-  if i_diff > j_diff && i_diff > k_diff {
-    ri = -rj - rk;
-  } else if j_diff > k_diff {
-    rj = -ri - rk;
-  } else {
-    rk = -ri - rj;
-  }
-
-  out_ijk.i = ri as i32;
-  out_ijk.j = rj as i32;
-  out_ijk.k = rk as i32;
+  cube_round(i_f, j_f, k_f, out_ijk);
 }
 
 /// Given two H3 cells, returns the line of H3 cells between them (inclusive).
@@ -185,7 +148,8 @@ pub fn grid_path_cells(start: H3Index, end: H3Index, out_path: &mut [H3Index]) -
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::indexing::lat_lng_to_cell;
+  use crate::coords::ijk::cube_to_ijk;
+use crate::indexing::lat_lng_to_cell;
   use crate::latlng::_set_geo_degs;
   use crate::traversal::neighbors::are_neighbor_cells;
   use crate::types::{LatLng, H3_NULL}; // For validation

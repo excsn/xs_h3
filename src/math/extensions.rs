@@ -1,5 +1,3 @@
-// src/math/extensions.rs
-
 /// Integer exponentiation.
 ///
 /// # Panics

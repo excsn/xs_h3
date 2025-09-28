@@ -1,11 +1,6 @@
-// src/traversal/grid_disk.rs
-
-use crate::constants::MAX_H3_RES;
-use crate::coords::ijk::_rotate60_ccw;
-use crate::h3_index::{get_resolution, is_pentagon}; // Assuming these are pub(crate) or pub
-use crate::math::extensions::_ipow; // For K_ALL_CELLS_AT_RES_15 if needed, or direct const
-use crate::traversal::neighbors::h3_neighbor_rotations; // From the module we just worked on
-use crate::types::{Direction, H3Error, H3Index, H3_NULL}; // For allocating memory if fallback is needed
+use crate::h3_index::is_pentagon;
+use crate::traversal::neighbors::h3_neighbor_rotations;
+use crate::types::{Direction, H3Error, H3Index, H3_NULL};
 
 // K_ALL_CELLS_AT_RES_15 from C algos.c
 // This constant defines the k-ring size that would encompass all cells at resolution 15.
@@ -111,20 +106,7 @@ fn _grid_disk_distances_internal(
     return Ok(()); // Reached max depth
   }
 
-  // Recurse to neighbors
-  // Directions for iteration (K, J, JK, I, IK, IJ)
-  // Using a fixed array to represent C's `DIRECTIONS` from algos.c if not already available
-  const CELL_DIRECTIONS: [Direction; 6] = [
-    Direction::KAxes,
-    Direction::JAxes,
-    Direction::JkAxes,
-    Direction::IAxes,
-    Direction::IkAxes,
-    Direction::IjAxes,
-  ];
-
   for dir_enum_val in 0..6 {
-    let dir_to_neighbor = CELL_DIRECTIONS[dir_enum_val];
 
     // Skip K direction for pentagons if this logic matches C's use of DIRECTIONS
     // C's `DIRECTIONS` array starts with J_AXES (2) and goes up to IJ_AXES (6).
@@ -504,7 +486,7 @@ pub fn grid_ring_unsafe(origin: H3Index, k: i32, out_cells: &mut [H3Index]) -> R
     // For each cell along this side.
     // For k=1, inner loop runs 1 time per side. Total 6 steps. out[0] to out[5].
     // For k=2, inner loop runs 2 times per side. Total 12 steps. out[0] to out[11].
-    for pos_on_side in 0..k {
+    for _pos_on_side in 0..k {
       let err = h3_neighbor_rotations(
         current_h,
         RING_TRAVERSAL_DIRECTIONS[side_idx],

@@ -1,32 +1,16 @@
-// src/coords/face_ijk.rs
-
 use crate::constants::{
-  EPSILON, INV_RES0_U_GNOMONIC, MAX_H3_RES, M_AP7_ROT_RADS, M_COS_AP7_ROT, M_ONETHIRD, M_PI_2, M_RSQRT7, M_SIN_AP7_ROT,
+  EPSILON, INV_RES0_U_GNOMONIC, MAX_H3_RES, M_AP7_ROT_RADS, M_ONETHIRD, M_RSQRT7,
   M_SQRT3_2, M_SQRT7, NUM_HEX_VERTS, NUM_ICOSA_FACES, NUM_PENT_VERTS, RES0_U_GNOMONIC,
 };
 use crate::coords::ijk::{
-  _down_ap3,
-  _down_ap3r,
-  _down_ap7r,
-  _hex2d_to_coord_ijk,
-  _ijk_add,
-  _ijk_normalize,
-  _ijk_rotate60_ccw,
-  _ijk_rotate60_cw,
-  _ijk_scale,
-  _ijk_sub,
-  _ijk_to_hex2d,
-  _set_ijk, // Added _set_ijk
+  _down_ap3, _down_ap3r, _down_ap7r, _hex2d_to_coord_ijk, _ijk_add, _ijk_normalize, _ijk_rotate60_ccw,
+  _ijk_rotate60_cw, _ijk_scale, _ijk_sub, _ijk_to_hex2d, _set_ijk,
 };
-use crate::latlng::{_geo_az_distance_rads, _geo_azimuth_rads, _pos_angle_rads, geo_almost_equal};
+use crate::latlng::{_geo_az_distance_rads, _geo_azimuth_rads, _pos_angle_rads};
 use crate::math::vec2d::{_v2d_almost_equals, _v2d_intersect, _v2d_mag};
 use crate::math::vec3d::{_geo_to_vec3d, _point_square_dist};
 use crate::types::{CellBoundary, CoordIJK, FaceIJK, LatLng, Vec2d, Vec3d};
 use crate::{h3_index, MAX_CELL_BNDRY_VERTS};
-
-// Import constants needed for face neighbor logic (assuming they are defined in this module or globally)
-// These were previously defined as statics within this file in your example.
-// Ensure they are accessible. For this correction, I'll assume they are part of this module's scope.
 
 // Quadrant constants - ensure these match your definitions (likely in this module or accessible)
 pub(crate) const IJ_QUADRANT: usize = 1; // IJ quadrant faceNeighbors table direction (example value)
@@ -395,8 +379,8 @@ pub(crate) fn _hex2d_to_geo(v: &Vec2d, face_idx: i32, res: i32, substrate: bool,
   let theta_hex2d = v.y.atan2(v.x);
   // println!("  theta_hex2d (atan2(v.y, v.x)): {:.10}", theta_hex2d);
   let mut r_hex2d_at_res0 = r_hex2d_at_input_res;
-  for i_res_scale in 0..res {
-    let old_r_hex2d = r_hex2d_at_res0;
+  for _i_res_scale in 0..res {
+    // let old_r_hex2d = r_hex2d_at_res0;
     r_hex2d_at_res0 *= M_RSQRT7;
     // println!(
     //   "  Res scaling loop {}: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
@@ -404,14 +388,14 @@ pub(crate) fn _hex2d_to_geo(v: &Vec2d, face_idx: i32, res: i32, substrate: bool,
     // );
   }
   if substrate {
-    let old_r_hex2d = r_hex2d_at_res0;
+    // let old_r_hex2d = r_hex2d_at_res0;
     r_hex2d_at_res0 *= M_ONETHIRD;
     // println!(
     //   "  Substrate scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_ONETHIRD: {:.10})",
     //   old_r_hex2d, r_hex2d_at_res0, M_ONETHIRD
     // );
     if crate::h3_index::is_resolution_class_iii(res) {
-      let old_r_hex2d_substrate_class3 = r_hex2d_at_res0;
+      // let old_r_hex2d_substrate_class3 = r_hex2d_at_res0;
       r_hex2d_at_res0 *= M_RSQRT7;
       // println!(
       //   "  Substrate Class III scaling: r_hex2d_at_res0 from {:.10} to {:.10} (by M_RSQRT7: {:.10})",
@@ -432,7 +416,7 @@ pub(crate) fn _hex2d_to_geo(v: &Vec2d, face_idx: i32, res: i32, substrate: bool,
   // );
   let mut theta_for_az = theta_hex2d;
   if !substrate && crate::h3_index::is_resolution_class_iii(res) {
-    let old_theta_for_az = theta_for_az;
+    // let old_theta_for_az = theta_for_az;
     theta_for_az = _pos_angle_rads(theta_for_az + M_AP7_ROT_RADS);
     // println!(
     //   "  Non-substrate Class III res {}, adjusted theta_for_az from {:.10} to {:.10} (by +M_AP7_ROT_RADS: {:.10})",
@@ -568,7 +552,7 @@ pub(crate) fn _adjust_overage_class_ii(fijk: &mut FaceIJK, res: i32, pent_leadin
     fijk.face = fijk_orient.face;
 
     for _i in 0..fijk_orient.ccw_rot60 {
-      let ijk_before_rot = *ijk;
+      // let ijk_before_rot = *ijk;
       _ijk_rotate60_ccw(ijk);
       // println!(
       //   "        Rotated ijk from {{i:{},j:{},k:{}}} to {{i:{},j:{},k:{}}}",
@@ -746,14 +730,14 @@ pub(crate) fn _face_ijk_pent_to_cell_boundary(h: &FaceIJK, res: i32, start: i32,
           x: -1.5 * max_dim as f64,
           y: -3.0 * M_SQRT3_2 * max_dim as f64,
         };
-        let (eA, eB) = match edge_dir as usize {
+        let (e_a, e_b) = match edge_dir as usize {
           IJ_QUADRANT => (&v0, &v1),
           JK_QUADRANT => (&v1, &v2),
           KI_QUADRANT => (&v2, &v0),
           _ => (&v0, &v0),
         };
         let mut inter = Vec2d::default();
-        _v2d_intersect(&prev2d, &curr2d, eA, eB, &mut inter);
+        _v2d_intersect(&prev2d, &curr2d, e_a, e_b, &mut inter);
         // println!("    Intersection: {{x:{:.4}, y:{:.4}}}", inter.x, inter.y);
 
         if g.num_verts < MAX_CELL_BNDRY_VERTS {
@@ -899,35 +883,35 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
       let edge_dir_idx = ADJACENT_FACE_DIR[center_ijk_on_face.face as usize][crossed_to_face as usize];
       // println!("        Edge direction index from ADJACENT_FACE_DIR: {}", edge_dir_idx);
 
-      let icosa_edge_vA: &Vec2d;
-      let icosa_edge_vB: &Vec2d;
+      let icosa_edge_va: &Vec2d;
+      let icosa_edge_vb: &Vec2d;
       let mut proceed_with_intersection = true;
 
       match edge_dir_idx {
         ij_quad if ij_quad == IJ_QUADRANT as i32 => {
-          icosa_edge_vA = &v0_icosa_edge;
-          icosa_edge_vB = &v1_icosa_edge;
+          icosa_edge_va = &v0_icosa_edge;
+          icosa_edge_vb = &v1_icosa_edge;
           // println!("        Crossing IJ quadrant edge (v0-v1)");
         }
         jk_quad if jk_quad == JK_QUADRANT as i32 => {
-          icosa_edge_vA = &v1_icosa_edge;
-          icosa_edge_vB = &v2_icosa_edge;
+          icosa_edge_va = &v1_icosa_edge;
+          icosa_edge_vb = &v2_icosa_edge;
           // println!("        Crossing JK quadrant edge (v1-v2)");
         }
         ki_quad if ki_quad == KI_QUADRANT as i32 => {
           // Explicit KI
-          icosa_edge_vA = &v2_icosa_edge;
-          icosa_edge_vB = &v0_icosa_edge;
+          icosa_edge_va = &v2_icosa_edge;
+          icosa_edge_vb = &v0_icosa_edge;
           // println!("        Crossing KI quadrant edge (v2-v0)");
         }
         _ => {
           // This case should ideally not be hit if faces are truly adjacent and differ
-          // println!("        ERROR: Invalid edge_dir_idx {} for HEXAGON distortion from ADJACENT_FACE_DIR for faces {} and {}. Skipping distortion vertex.", 
+          // println!("        ERROR: Invalid edge_dir_idx {} for HEXAGON distortion from ADJACENT_FACE_DIR for faces {} and {}. Skipping distortion vertex.",
           //                    edge_dir_idx, center_ijk_on_face.face, crossed_to_face);
           proceed_with_intersection = false;
           // Assign dummy values to satisfy compiler, but they won't be used
-          icosa_edge_vA = &v0_icosa_edge; // Assuming v0_icosa_edge refers to one of the defined edges
-          icosa_edge_vB = &v0_icosa_edge;
+          icosa_edge_va = &v0_icosa_edge; // Assuming v0_icosa_edge refers to one of the defined edges
+          icosa_edge_vb = &v0_icosa_edge;
         }
       }
 
@@ -937,8 +921,8 @@ pub(crate) fn _face_ijk_to_cell_boundary(h: &FaceIJK, res: i32, start: i32, leng
         _v2d_intersect(
           &v2d_prev_topo_on_center_face,
           &v2d_curr_topo_on_center_face,
-          icosa_edge_vA, // Now guaranteed to be initialized if proceed_with_intersection is true
-          icosa_edge_vB,
+          icosa_edge_va, // Now guaranteed to be initialized if proceed_with_intersection is true
+          icosa_edge_vb,
           &mut intersection_hex2d,
         );
         // println!(
@@ -1075,7 +1059,7 @@ pub(crate) fn _face_ijk_pent_to_verts(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::constants::{EPSILON_DEG, EPSILON_RAD, M_PI_180, NUM_HEX_VERTS, NUM_PENT_VERTS};
+  use crate::constants::{EPSILON_DEG, EPSILON_RAD, M_PI_180, M_PI_2, NUM_HEX_VERTS, NUM_PENT_VERTS};
   use crate::coords::ijk::_ijk_matches;
   use crate::latlng::{_set_geo_degs, geo_almost_equal_threshold};
   use crate::types::LatLng;
@@ -1111,7 +1095,7 @@ mod tests {
     for f_orig_idx in 0..(NUM_ICOSA_FACES as usize) {
       for &res_orig_val in &[0, 1, 5] {
         let res_orig = res_orig_val as i32;
-        let mut v_orig: Vec2d;
+        let v_orig: Vec2d;
         if res_orig == 0 {
           v_orig = Vec2d { x: 0.0, y: 0.0 };
         } else {

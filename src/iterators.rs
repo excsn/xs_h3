@@ -1,13 +1,8 @@
-// src/iterators.rs
-#![allow(non_snake_case)] // To match C API names like iterInitParent
-
 use crate::base_cells::baseCellNumToCell;
 use crate::constants::{MAX_H3_RES, NUM_BASE_CELLS};
-use crate::h3_index::{
-  _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution,
-};
-use crate::hierarchy::parent_child::_zero_index_digits; // Use the helper we created
-use crate::types::{Direction, H3Index, H3_NULL}; // If this is how we get initial base cell
+use crate::h3_index::{get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution};
+use crate::hierarchy::parent_child::_zero_index_digits;
+use crate::types::{Direction, H3Index, H3_NULL};
 
 /// Iterator for traversing the children of a parent H3 cell at a specific resolution.
 ///
@@ -19,10 +14,10 @@ pub struct IterCellsChildren {
   /// The current H3 child cell in the iteration. `H3_NULL` if exhausted.
   pub h: H3Index,
   /// Resolution of the parent cell from which children are derived.
-  pub(crate) _parentRes: i32,
+  pub(crate) _parent_res: i32,
   /// Internal: The resolution digit that needs to skip `Direction::KAxes` for pentagons.
   /// Moves towards coarser resolutions as iteration proceeds. -1 if not a pentagon path.
-  pub(crate) _skipDigitRes: i32, // Renamed from _skipDigit to be more descriptive of its value
+  pub(crate) _skip_digit_res: i32, // Renamed from _skipDigit to be more descriptive of its value
 }
 
 impl IterCellsChildren {
@@ -30,16 +25,36 @@ impl IterCellsChildren {
   fn null_iter() -> Self {
     Self {
       h: H3_NULL,
-      _parentRes: -1,
-      _skipDigitRes: -1,
+      _parent_res: -1,
+      _skip_digit_res: -1,
     }
+  }
+}
+
+impl Iterator for IterCellsChildren {
+  type Item = H3Index;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    // If the iterator is already exhausted, return None.
+    if self.h == H3_NULL {
+      return None;
+    }
+
+    // Store the current cell to be returned.
+    let current_h = self.h;
+
+    // Advance the iterator's internal state for the *next* call.
+    iter_step_child(self);
+
+    // Return the stored cell.
+    Some(current_h)
   }
 }
 
 /// Initializes an iterator for the children of H3 cell `parent_h` at `child_res`.
 ///
 /// The first child is available in `iter.h` after calling this function.
-pub fn iterInitParent(parent_h: H3Index, child_res: i32) -> IterCellsChildren {
+pub fn iter_init_parent(parent_h: H3Index, child_res: i32) -> IterCellsChildren {
   let parent_res = get_resolution(parent_h);
 
   if child_res < parent_res
@@ -56,13 +71,6 @@ pub fn iterInitParent(parent_h: H3Index, child_res: i32) -> IterCellsChildren {
   set_resolution(&mut h_iter, child_res);
   h_iter = _zero_index_digits(h_iter, parent_res + 1, child_res);
 
-  let skip_digit_res = if is_pentagon(h_iter) {
-    // Check the *child* at target res for pentagon status
-    child_res
-  } else {
-    -1
-  };
-
   // The C code sets _skipDigit to childRes if the *original parent* is a pentagon.
   // Let's match that more closely for direct porting.
   // The pentagon-ness of the iteration path is determined by the original parent.
@@ -70,14 +78,14 @@ pub fn iterInitParent(parent_h: H3Index, child_res: i32) -> IterCellsChildren {
 
   IterCellsChildren {
     h: h_iter,
-    _parentRes: parent_res,
-    _skipDigitRes: skip_digit_res_c_style,
+    _parent_res: parent_res,
+    _skip_digit_res: skip_digit_res_c_style,
   }
 }
 
 /// Initializes an iterator for all H3 cells at `child_res` that are descendants
 /// of the base cell `base_cell_num`.
-pub fn iterInitBaseCellNum(base_cell_num: i32, child_res: i32) -> IterCellsChildren {
+pub fn iter_init_base_cell_num(base_cell_num: i32, child_res: i32) -> IterCellsChildren {
   if base_cell_num < 0 || base_cell_num >= (NUM_BASE_CELLS as i32) || child_res < 0 || child_res > MAX_H3_RES {
     return IterCellsChildren::null_iter();
   }
@@ -87,13 +95,13 @@ pub fn iterInitBaseCellNum(base_cell_num: i32, child_res: i32) -> IterCellsChild
     // Should not happen with valid base_cell_num
     return IterCellsChildren::null_iter();
   }
-  iterInitParent(base_cell_h3, child_res)
+  iter_init_parent(base_cell_h3, child_res)
 }
 
 /// Steps the `IterCellsChildren` iterator to the next child cell.
 /// After stepping, the next cell is available in `iter.h`.
 /// If `iter.h` is `H3_NULL`, the iteration is complete.
-pub fn iterStepChild(iter: &mut IterCellsChildren) {
+pub fn iter_step_child(iter: &mut IterCellsChildren) {
   if iter.h == H3_NULL {
     return;
   }
@@ -110,16 +118,16 @@ pub fn iterStepChild(iter: &mut IterCellsChildren) {
 
   // Phase 2: K-Skip. This part executes only if iter.h is still valid.
   // Check if the current _skipDigitRes is valid and needs skipping.
-  if iter._skipDigitRes >= iter._parentRes + 1 {
+  if iter._skip_digit_res >= iter._parent_res + 1 {
     // Still relevant to skip
-    if get_index_digit(iter.h, iter._skipDigitRes) == Direction::KAxes {
+    if get_index_digit(iter.h, iter._skip_digit_res) == Direction::KAxes {
       // Yes, the digit at the skip-responsible level is K.
       // Increment starting from this specific digit and cascade.
-      if _naive_increment_and_cascade(iter, iter._skipDigitRes) {
+      if _naive_increment_and_cascade(iter, iter._skip_digit_res) {
         return; // Cascaded past parent during K-skip adjustment
       }
       // If successful, the responsibility moves up.
-      iter._skipDigitRes -= 1;
+      iter._skip_digit_res -= 1;
     }
   }
 }
@@ -130,7 +138,7 @@ pub fn iterStepChild(iter: &mut IterCellsChildren) {
 fn _naive_increment_and_cascade(iter: &mut IterCellsChildren, level_to_inc_from: i32) -> bool {
   let mut r_cascade = level_to_inc_from;
   loop {
-    if r_cascade < iter._parentRes + 1 {
+    if r_cascade < iter._parent_res + 1 {
       *iter = IterCellsChildren::null_iter();
       return true;
     }
@@ -142,7 +150,7 @@ fn _naive_increment_and_cascade(iter: &mut IterCellsChildren, level_to_inc_from:
       // Rollover
       set_index_digit(&mut iter.h, r_cascade, Direction::Center);
       // DO NOT MODIFY _skipDigitRes here.
-      if r_cascade == iter._parentRes + 1 {
+      if r_cascade == iter._parent_res + 1 {
         *iter = IterCellsChildren::null_iter();
         return true;
       }
@@ -163,9 +171,9 @@ fn _naive_increment_and_cascade(iter: &mut IterCellsChildren, level_to_inc_from:
 pub struct IterCellsResolution {
   /// The current H3 cell in the iteration. `H3_NULL` if exhausted.
   pub h: H3Index,
-  pub(crate) _baseCellNum: i32,
+  pub(crate) _base_cell_num: i32,
   pub(crate) _res: i32,
-  pub(crate) _itC: IterCellsChildren, // Internal child iterator
+  pub(crate) _it_c: IterCellsChildren, // Internal child iterator
 }
 
 impl IterCellsResolution {
@@ -173,49 +181,49 @@ impl IterCellsResolution {
   fn null_iter() -> Self {
     Self {
       h: H3_NULL,
-      _baseCellNum: -1,
+      _base_cell_num: -1,
       _res: -1,
-      _itC: IterCellsChildren::null_iter(),
+      _it_c: IterCellsChildren::null_iter(),
     }
   }
 }
 
 /// Initializes an iterator for all H3 cells at the given `res`.
 /// The first cell is available in `iter.h` after calling this function.
-pub fn iterInitRes(res: i32) -> IterCellsResolution {
+pub fn iter_init_res(res: i32) -> IterCellsResolution {
   if res < 0 || res > MAX_H3_RES {
     return IterCellsResolution::null_iter();
   }
 
-  let child_iter = iterInitBaseCellNum(0, res);
+  let child_iter = iter_init_base_cell_num(0, res);
   IterCellsResolution {
     h: child_iter.h,
-    _baseCellNum: 0,
+    _base_cell_num: 0,
     _res: res,
-    _itC: child_iter,
+    _it_c: child_iter,
   }
 }
 
 /// Steps the `IterCellsResolution` iterator to the next H3 cell at the resolution.
-pub fn iterStepRes(iter: &mut IterCellsResolution) {
+pub fn iter_step_res(iter: &mut IterCellsResolution) {
   if iter.h == H3_NULL {
     return; // Iteration already complete or errored
   }
 
-  iterStepChild(&mut iter._itC);
+  iter_step_child(&mut iter._it_c);
 
   // If the child iterator for the current base cell is exhausted,
   // and there are more base cells, move to the next base cell.
-  if iter._itC.h == H3_NULL {
-    iter._baseCellNum += 1;
-    if iter._baseCellNum < (NUM_BASE_CELLS as i32) {
-      iter._itC = iterInitBaseCellNum(iter._baseCellNum, iter._res);
+  if iter._it_c.h == H3_NULL {
+    iter._base_cell_num += 1;
+    if iter._base_cell_num < (NUM_BASE_CELLS as i32) {
+      iter._it_c = iter_init_base_cell_num(iter._base_cell_num, iter._res);
     } else {
       // All base cells processed, iteration is complete.
       // _itC.h is already H3_NULL.
     }
   }
-  iter.h = iter._itC.h; // Update current cell
+  iter.h = iter._it_c.h; // Update current cell
 }
 
 #[cfg(test)]
@@ -229,38 +237,38 @@ mod tests {
   #[test]
   fn test_iter_init_parent_invalid() {
     let parent = H3Index(0x85283473fffffff); // Res 5
-    let mut iter = iterInitParent(parent, 4); // Child res coarser
+    let mut iter = iter_init_parent(parent, 4); // Child res coarser
     assert_eq!(iter.h, H3_NULL);
 
-    iter = iterInitParent(parent, MAX_H3_RES + 1); // Child res too fine
+    iter = iter_init_parent(parent, MAX_H3_RES + 1); // Child res too fine
     assert_eq!(iter.h, H3_NULL);
 
-    iter = iterInitParent(H3_NULL, 5);
+    iter = iter_init_parent(H3_NULL, 5);
     assert_eq!(iter.h, H3_NULL);
 
     let mut invalid_parent = parent;
     h3_index::set_mode(&mut invalid_parent, 0); // Invalid mode
-    iter = iterInitParent(invalid_parent, 6);
+    iter = iter_init_parent(invalid_parent, 6);
     assert_eq!(iter.h, H3_NULL);
   }
 
   #[test]
   fn test_iter_init_base_cell_num_invalid() {
-    let mut iter = iterInitBaseCellNum(-1, 0);
+    let mut iter = iter_init_base_cell_num(-1, 0);
     assert_eq!(iter.h, H3_NULL);
-    iter = iterInitBaseCellNum(NUM_BASE_CELLS as i32, 0);
+    iter = iter_init_base_cell_num(NUM_BASE_CELLS as i32, 0);
     assert_eq!(iter.h, H3_NULL);
-    iter = iterInitBaseCellNum(0, -1);
+    iter = iter_init_base_cell_num(0, -1);
     assert_eq!(iter.h, H3_NULL);
-    iter = iterInitBaseCellNum(0, MAX_H3_RES + 1);
+    iter = iter_init_base_cell_num(0, MAX_H3_RES + 1);
     assert_eq!(iter.h, H3_NULL);
   }
 
   #[test]
   fn test_iter_init_res_invalid() {
-    let mut iter = iterInitRes(-1);
+    let mut iter = iter_init_res(-1);
     assert_eq!(iter.h, H3_NULL);
-    iter = iterInitRes(MAX_H3_RES + 1);
+    iter = iter_init_res(MAX_H3_RES + 1);
     assert_eq!(iter.h, H3_NULL);
   }
 
@@ -270,7 +278,7 @@ mod tests {
     let child_res = 7;
     let expected_count = cell_to_children_size(parent, child_res).unwrap();
 
-    let mut iter = iterInitParent(parent, child_res);
+    let mut iter = iter_init_parent(parent, child_res);
     let mut count = 0;
     let mut first_child = H3_NULL;
     let mut last_child = H3_NULL;
@@ -287,7 +295,7 @@ mod tests {
       assert_eq!(current_parent, parent);
 
       count += 1;
-      iterStepChild(&mut iter);
+      iter_step_child(&mut iter);
     }
     assert_eq!(count, expected_count);
     assert_ne!(first_child, H3_NULL);
@@ -310,7 +318,7 @@ mod tests {
                                                                                  // Total = 1+5+30+5 = 41 for res 2 from res 0 pent.
     assert_eq!(expected_count, 1 + 5 * ((_ipow(7, 2) - 1) / 6)); // Should be 41
 
-    let mut iter = iterInitParent(parent_pent, child_res);
+    let mut iter = iter_init_parent(parent_pent, child_res);
     let mut count = 0;
     while iter.h != H3_NULL {
       assert_eq!(h3_index::get_resolution(iter.h), child_res);
@@ -318,7 +326,7 @@ mod tests {
       let current_parent = crate::hierarchy::parent_child::cell_to_parent(iter.h, get_resolution(parent_pent)).unwrap();
       assert_eq!(current_parent, parent_pent);
       count += 1;
-      iterStepChild(&mut iter);
+      iter_step_child(&mut iter);
     }
     assert_eq!(count, expected_count);
   }
@@ -329,7 +337,7 @@ mod tests {
       // Test a few low resolutions
       let expected_count_total = crate::h3_index::get_num_cells(res).unwrap(); // Assuming getNumCells is ported
 
-      let mut iter = iterInitRes(res);
+      let mut iter = iter_init_res(res);
       let mut count = 0;
       let mut prev_h = H3_NULL;
       while iter.h != H3_NULL {
@@ -341,7 +349,7 @@ mod tests {
         }
         prev_h = iter.h;
         count += 1;
-        iterStepRes(&mut iter);
+        iter_step_res(&mut iter);
       }
       assert_eq!(count, expected_count_total);
     }

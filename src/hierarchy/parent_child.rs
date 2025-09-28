@@ -6,7 +6,7 @@ use crate::h3_index::{
   _h3_leading_non_zero_digit, get_index_digit, get_resolution, is_pentagon, set_index_digit, set_resolution,
 }; // Alias to avoid conflict if used locally
 
-use crate::iterators::{iterInitParent, iterStepChild, IterCellsChildren}; // For cellToChildren
+use crate::iterators::{iter_init_parent, iter_step_child, IterCellsChildren}; // For cellToChildren
 use crate::math::extensions::_ipow;
 use crate::types::{Direction, H3Error, H3Index};
 
@@ -144,7 +144,7 @@ pub fn cell_to_children(h: H3Index, child_res: i32, children: &mut [H3Index]) ->
     return Err(H3Error::MemoryBounds);
   }
 
-  let mut iter = iterInitParent(h, child_res); // Assumes iterators.rs is ported
+  let mut iter = iter_init_parent(h, child_res); // Assumes iterators.rs is ported
   let mut i: usize = 0;
   while iter.h != crate::types::H3_NULL {
     if i >= children.len() {
@@ -153,7 +153,7 @@ pub fn cell_to_children(h: H3Index, child_res: i32, children: &mut [H3Index]) ->
     }
     children[i] = iter.h;
     i += 1;
-    iterStepChild(&mut iter);
+    iter_step_child(&mut iter);
   }
   // Zero out remaining part of buffer if iter produced fewer than expected_size
   // This can happen if expected_size was for a hexagon but h was a pentagon.

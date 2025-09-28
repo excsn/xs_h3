@@ -1,6 +1,4 @@
-// src/h3_index/string_conv.rs
-
-use crate::types::{H3Error, H3Index, H3_NULL};
+use crate::types::{H3Error, H3Index};
 
 /// Converts a string representation of an H3 index into an `H3Index`.
 ///

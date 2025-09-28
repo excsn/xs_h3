@@ -1,5 +1,3 @@
-// src/indexing/mod.rs
-
 pub mod from_h3;
 pub mod to_h3;
 

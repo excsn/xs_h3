@@ -9,11 +9,11 @@ use crate::base_cells::{
 };
 use crate::coords::face_ijk::{Overage, _adjust_overage_class_ii};
 use crate::coords::ijk::{
-  _down_ap7, _down_ap7r, _ijk_normalize, _ijk_sub, _neighbor, _rotate60_ccw, _rotate60_cw, _unit_ijk_to_digit, _up_ap7,
-  _up_ap7r, UNIT_VECS,
+  _down_ap7, _down_ap7r, _ijk_normalize, _ijk_sub, _neighbor, _unit_ijk_to_digit,
+  _up_ap7r,
 };
 use crate::types::{CoordIJK, Direction, FaceIJK, H3Index};
-use crate::{constants::*, H3Error, H3_NULL}; // From base_cells.rs
+use crate::{constants::*, H3Error, H3_NULL};
 
 pub use inspection::{get_num_cells, is_pentagon};
 pub use string_conv::{h3_to_string, h3_to_string_alloc, string_to_h3};
@@ -861,7 +861,7 @@ mod tests {
   }
 
   fn roundtrip_h3_through_fijk_at_res(h_coarse: H3Index, target_res: i32) {
-    let mut iter = crate::iterators::iterInitParent(h_coarse, target_res);
+    let mut iter = crate::iterators::iter_init_parent(h_coarse, target_res);
     while iter.h != H3_NULL {
       let fijk_producing_h3_child = iter.h;
 
@@ -880,7 +880,7 @@ mod tests {
         fijk_producing_h3_child.0, fijk_canonical, h3_roundtrip.0
       );
 
-      crate::iterators::iterStepChild(&mut iter);
+      crate::iterators::iter_step_child(&mut iter);
     }
   }
 

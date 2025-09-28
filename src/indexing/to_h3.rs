@@ -1,10 +1,7 @@
-// src/indexing/to_h3.rs
-
 use crate::constants::MAX_H3_RES;
-use crate::coords::face_ijk::_geo_to_face_ijk; // pub(crate) in face_ijk.rs
-use crate::h3_index::_face_ijk_to_h3; // pub(crate) in h3_index/mod.rs
+use crate::coords::face_ijk::_geo_to_face_ijk;
+use crate::h3_index::_face_ijk_to_h3;
 use crate::types::{H3Error, H3Index, LatLng, H3_NULL};
-use std::f64; // For is_finite
 
 /// Finds the H3 index of the cell containing the given `LatLng` point at the specified resolution.
 ///

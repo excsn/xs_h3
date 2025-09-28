@@ -315,7 +315,6 @@ pub fn get_icosahedron_faces(h: H3Index, out_faces: &mut [i32]) -> Result<usize,
 
   for dir_idx in 1..7 {
     // Iterate through 6 directions (skip Center)
-    let dir: Direction = unsafe { std::mem::transmute(dir_idx as u8) };
     let neighbor_bc = BASE_CELL_NEIGHBORS[base_cell as usize][dir_idx as usize];
     if neighbor_bc != INVALID_BASE_CELL && neighbor_bc != base_cell {
       let neighbor_home_fijk = BASE_CELL_DATA[neighbor_bc as usize].home_fijk;
@@ -400,7 +399,7 @@ mod tests {
     assert!(!is_valid_cell(h), "isValidCell failed on used digit being InvalidDigit");
 
     // Test unused digits not being 7
-    let mut h2 = H3Index(0x8100700000000000); // Res 1, BC0, D1=Center, D2=0 (should be 7)
+    let h2 = H3Index(0x8100700000000000); // Res 1, BC0, D1=Center, D2=0 (should be 7)
     assert!(!is_valid_cell(h2), "isValidCell failed on unused digit not being 7");
   }
 
@@ -593,10 +592,10 @@ mod tests {
     // eprintln!("H3_BC_OFFSET: {}", H3_BC_OFFSET);
     // eprintln!("Input H3Index (h.0): 0x{:016x}", h_origin.0);
 
-    let h_shifted_for_mask = h_origin.0 & H3_BC_MASK;
+    // let h_shifted_for_mask = h_origin.0 & H3_BC_MASK;
     // eprintln!("h.0 & H3_BC_MASK:    0x{:016x}", h_shifted_for_mask);
 
-    let base_cell_val_before_cast = (h_origin.0 & H3_BC_MASK) >> H3_BC_OFFSET;
+    // let base_cell_val_before_cast = (h_origin.0 & H3_BC_MASK) >> H3_BC_OFFSET;
     // eprintln!(
     //   "(h.0 & H3_BC_MASK) >> H3_BC_OFFSET: {} (0x{:x})",
     //   base_cell_val_before_cast, base_cell_val_before_cast
@@ -621,11 +620,11 @@ mod tests {
     // eprintln!("H3_BC_OFFSET: {}", H3_BC_OFFSET);
     // eprintln!("Input H3Index (h.0): 0x{:016x}", h_known_valid.0);
 
-    let h_masked_for_bc = h_known_valid.0 & H3_BC_MASK;
+    // let h_masked_for_bc = h_known_valid.0 & H3_BC_MASK;
     // eprintln!("h.0 & H3_BC_MASK:    0x{:016x}", h_masked_for_bc);
     // Expected: 0x085143473fffffff & 0x00FE000000000000 = 0x0014000000000000
 
-    let base_cell_val_before_cast = (h_known_valid.0 & H3_BC_MASK) >> H3_BC_OFFSET;
+    // let base_cell_val_before_cast = (h_known_valid.0 & H3_BC_MASK) >> H3_BC_OFFSET;
     // eprintln!(
     //   "(h.0 & H3_BC_MASK) >> H3_BC_OFFSET: {} (0x{:x})",
     //   base_cell_val_before_cast, base_cell_val_before_cast

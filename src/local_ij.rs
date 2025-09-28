@@ -1,19 +1,17 @@
 use crate::base_cells::{
-  _base_cell_is_cw_offset, _face_ijk_to_base_cell, _face_ijk_to_base_cell_ccwrot60, _get_base_cell_direction,
-  _get_base_cell_neighbor, _is_base_cell_pentagon, _is_base_cell_polar_pentagon, BASE_CELL_NEIGHBOR_60CCW_ROTS,
-  INVALID_BASE_CELL,
+  _get_base_cell_direction,
+  _is_base_cell_pentagon,
 };
-use crate::constants::{H3_CELL_MODE, H3_INIT, MAX_H3_RES, NUM_BASE_CELLS};
 use crate::coords::face_ijk::{ADJACENT_FACE_DIR, FACE_NEIGHBORS, INVALID_FACE}; // This table is crucial
 use crate::coords::ijk::{
-  _down_ap7, _down_ap7r, _ijk_add, _ijk_normalize, _ijk_normalize_could_overflow, _ijk_rotate60_ccw, _ijk_rotate60_cw,
-  _ijk_scale, _ijk_sub, _rotate60_ccw, _unit_ijk_to_digit, _up_ap7, _up_ap7r, ij_to_ijk, ijk_to_ij, UNIT_VECS,
+  _down_ap7, _down_ap7r, _ijk_add, _ijk_normalize, _ijk_rotate60_ccw, _ijk_rotate60_cw,
+  _ijk_sub, ij_to_ijk, ijk_to_ij,
 };
 use crate::h3_index::inspection::is_valid_cell;
 use crate::h3_index::{
-  _face_ijk_to_h3, _h3_leading_non_zero_digit, _h3_rotate60_ccw, _h3_rotate60_cw, _h3_rotate_pent60_ccw,
-  _h3_rotate_pent60_cw, _h3_to_face_ijk, get_base_cell, get_index_digit, get_mode, get_resolution, is_pentagon,
-  is_resolution_class_iii, set_base_cell, set_index_digit, set_mode, set_resolution,
+  _face_ijk_to_h3, _h3_leading_non_zero_digit, _h3_rotate_pent60_ccw,
+  _h3_rotate_pent60_cw, _h3_to_face_ijk, get_base_cell, get_resolution, is_pentagon,
+  is_resolution_class_iii,
 };
 use crate::types::{CoordIJ, CoordIJK, Direction, FaceIJK, H3Error, H3Index, H3_NULL};
 
@@ -290,13 +288,7 @@ fn _face_to_face_ijk_inplace(fijk_target: &mut FaceIJK, res: i32, target_face: i
   if fijk_target.face == target_face {
     return Ok(()); // Already on the target face
   }
-
-  // Create a temporary FaceIJK for the center of the current face, on the current face
-  let mut center_on_current_face = FaceIJK {
-    face: fijk_target.face,
-    coord: CoordIJK { i: 0, j: 0, k: 0 },
-  };
-
+  
   // Now transform this center point to the target_face coordinate system
   // This uses the Fijk translation logic found in C's _faceToFaceIjk
   // It involves finding the path of faces from fijk_target.face to target_face

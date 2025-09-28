@@ -1,17 +1,13 @@
-// src/traversal/neighbors.rs
-
 use crate::base_cells::{
   _base_cell_is_cw_offset,
-  _get_base_cell_direction, // Corrected name from C-style to snake_case
-  _get_base_cell_neighbor,  // Corrected name
   _is_base_cell_pentagon,
   _is_base_cell_polar_pentagon,
-  BASE_CELL_DATA,                // Corrected to uppercase
-  BASE_CELL_NEIGHBORS,           // Corrected to uppercase
-  BASE_CELL_NEIGHBOR_60CCW_ROTS, // Corrected to uppercase
+  BASE_CELL_DATA,
+  BASE_CELL_NEIGHBORS,
+  BASE_CELL_NEIGHBOR_60CCW_ROTS,
   INVALID_BASE_CELL,
 };
-use crate::constants::{H3_CELL_MODE, MAX_H3_RES, NUM_BASE_CELLS};
+use crate::constants::{H3_CELL_MODE, NUM_BASE_CELLS};
 use crate::coords::ijk::_rotate60_ccw;
 use crate::types::Direction;
 use crate::{is_pentagon, H3_NULL};
